@@ -1,0 +1,27 @@
+{
+    "data":{
+        "data_sign":"Indian",
+        "diffusion_sign":false,
+        "patch_size":5,
+        "test_ratio":0.90,
+        "batch_size":64,
+        "num_classes":16,
+        "pca":200,
+        "spectral_size": 200
+    },
+    "net": {
+        "trainer" : "contra_cross_transformer",
+        "net_type": "just_spectral",
+	    "mlp_head_dim": 64,
+        "depth":5,
+        "dim":64,
+        "conv3d_kernal_size":[3,3,3],
+        "conv3d_padding":[2,1,1]
+    },
+    "train": {
+        "epochs": 500,
+        "lr":0.001,
+        "weight_decay":0
+    }
+}
+
