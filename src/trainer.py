@@ -10,6 +10,7 @@ from models import conv2d
 from models import conv3d
 from models import s3net
 import utils
+from augment import do_augment
 from utils import recorder
 from evaluation import HSIEvaluation
 
@@ -87,6 +88,7 @@ class BaseTrainer(object):
         self.net = None
         self.criterion = None
         self.optimizer = None
+        self.augment=params.get('augment',None)
         self.clip = 15
         self.real_init()
 
@@ -105,6 +107,8 @@ class BaseTrainer(object):
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
+                if self.augment:
+                    data=do_augment(self.augment,data)
                 outputs = self.net(data)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
@@ -308,9 +312,19 @@ class S3NetTrainer(BaseTrainer):
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
     def get_loss(self,outputs,target):
-        logits,A_vecs,B_vecs,C_vecs=outputs
-
-        l_cre=nn.CorssEntropyLoss()(target,logits)
+        # outputs是三个[batch,K]的矩阵，但是根据论文，还应该有每个patch的中心矢量
+        A_vecs,B_vecs,C_vecs,L1_vecs,L2_vecs=outputs
+        batch_size=A_vecs.size(0)
+        l_ctr=0
+        for i in range(batch_size):
+            for j in range(batch_size):
+                w=torch.dot(L1_vecs[i],L2_vecs[j])/torch.norm(L1_vecs[i])/torch.norm(L2_vecs[j])
+                if(i==j):
+                    l_ctr+=target[i]*(1-w)*torch.norm(A_vecs[i]-B_vecs[j])
+                else:
+                    l_ctr+=(1-target[i])*w*torch.norm(A_vecs[i]-B_vecs[j])
+        l_cre=nn.CorssEntropyLoss()(target,C_vecs)
+        return l_ctr+l_cre
 
 def get_trainer(params):
     trainer_type = params['net']['trainer']
