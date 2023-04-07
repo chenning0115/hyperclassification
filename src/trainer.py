@@ -8,6 +8,7 @@ from models import cross_transformer
 from models import conv1d
 from models import conv2d
 from models import conv3d
+from models import s3net
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
@@ -293,6 +294,23 @@ class Conv3dTrainer(BaseTrainer):
         self.lr = self.train_params.get('lr', 0.001)
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+class S3NetTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+    def real_init(self):
+        # net
+        self.net=s3net.S3Net(self.params).to(self.device)
+        # optimizer
+        self.lr=self.train_params.get('lr',0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def get_loss(self,outputs,target):
+        logits,A_vecs,B_vecs,C_vecs=outputs
+
+        l_cre=nn.CorssEntropyLoss()(target,logits)
 
 def get_trainer(params):
     trainer_type = params['net']['trainer']
