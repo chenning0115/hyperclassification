@@ -204,8 +204,6 @@ class CrossTransformer(nn.Module):
 
         return x, y
 
-
-
 class HSINet(nn.Module):
     def __init__(self, params):
         super(HSINet, self).__init__()
@@ -218,118 +216,68 @@ class HSINet(nn.Module):
         self.spectral_size = data_params.get("spectral_size", 200)
 
         dim = net_params.get("dim", 64)
-        depth = net_params.get("depth", 5)
-        heads = net_params.get("heads", 4)
-        dim_heads = net_params.get("dim_heads", 16)
+        depth = net_params.get("depth", 1)
+        heads = net_params.get("heads", 8)
         mlp_dim = net_params.get("mlp_dim", 8)
-        dropout = net_params.get("dropout", 0.)
+        dropout = net_params.get("dropout", 0.1)
+        conv2d_out = 64
+        dim_heads = dim
+        mlp_head_dim = dim
         
         image_size = patch_size * patch_size
 
-        # 依据光谱连续性降低spectral维度 同时引入空间信息 200-3+2*2
-        conv3d_kernal_size = net_params.get("conv3d_kernal_size", [3,5,5])
-        conv3d_stride = net_params.get("conv3d_stride", [3,1,1])
-        conv3d_padding = net_params.get("conv3d_padding", [2,2,2])
-        self.conv3d_for_spectral_trans = nn.Sequential(
-            nn.Conv3d(1, out_channels=1, kernel_size=conv3d_kernal_size, stride=conv3d_stride, padding=conv3d_padding),
-            nn.ReLU(),
-        )
-
-        self.new_spectral_size = int((self.spectral_size - conv3d_kernal_size[0] + 2 * conv3d_padding[0]) / conv3d_stride[0]) + 1
-        self.new_image_size = image_size
-        print("new_spectral_size", self.new_spectral_size)
-        print("new_image_size", self.new_image_size)
-        self.spectral_patch_embedding = nn.Linear(self.new_image_size, dim)
         self.pixel_patch_embedding = nn.Linear(self.spectral_size, dim)
 
-        self.local_trans_spectral = Transformer(dim=dim, depth=depth, heads=heads, dim_heads=dim_heads, mlp_dim=mlp_dim, dropout=dropout)
         self.local_trans_pixel = Transformer(dim=dim, depth=depth, heads=heads, dim_heads=dim_heads, mlp_dim=mlp_dim, dropout=dropout)
-
-        self.cross_trans = CrossTransformer(dim=dim, heads=heads, mlp_dim=mlp_dim, drouput=dropout)
-
-        self.spectral_pos_embedding = nn.Parameter(torch.randn(1, self.new_spectral_size+1, dim))
+        self.new_image_size = image_size
         self.pixel_pos_embedding = nn.Parameter(torch.randn(1, self.new_image_size+1, dim))
+        self.pixel_pos_scale = nn.Parameter(torch.ones(1)*0.01)
 
-        mlp_head_dim = params['net'].get('mlp_head_dim', 8)
-        self.mlp_head = nn.Sequential(
-            nn.LayerNorm(mlp_head_dim),
-            nn.Linear(mlp_head_dim, num_classes)
+        self.conv2d_features = nn.Sequential(
+            nn.Conv2d(in_channels=self.spectral_size, out_channels=conv2d_out, kernel_size=(3, 3), padding=(1,1)),
+            nn.BatchNorm2d(conv2d_out),
+            nn.ReLU(),
         )
-
-        self.cls_token_spectral = nn.Parameter(torch.randn(1, 1, dim))
         self.cls_token_pixel = nn.Parameter(torch.randn(1, 1, dim))
-        self.to_latent_spectral = nn.Identity()
         self.to_latent_pixel = nn.Identity()
+
+        self.mlp_head = nn.Linear(mlp_head_dim, num_classes)
+        torch.nn.init.xavier_uniform_(self.mlp_head.weight)
+        torch.nn.init.normal_(self.mlp_head.bias, std=1e-6)
+
+        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         '''
         x: (batch, p, w, h), s=spectral, w=weigth, h=height
 
         '''
-        x_spectral = x_pixel = x 
+        x_pixel = x 
 
-        b, s, w, h = x_spectral.shape
+        b, s, w, h = x_pixel.shape
         img = w * h
-        #0. Conv
-        # x_pixel = self.conv2d_for_pixel_trans(x) #(batch, p, w, h)
-        x_spectral = torch.unsqueeze(x_spectral, 1) #(batch, c, p, w, h)
-        x_spectral = self.conv3d_for_spectral_trans(x_spectral)
-        x_spectral = torch.squeeze(x_spectral, 1) #(batch, p, w, h)
-
+        x_pixel = self.conv2d_features(x_pixel)
         #1. reshape
-        x_spectral = rearrange(x_spectral, 'b s w h-> b s (w h)') # (batch, s, w*h)
         x_pixel = rearrange(x_pixel, 'b s w h-> b (w h) s') # (batch, s, w*h)
 
         #2. patch_embedding
-        x_spectral = self.spectral_patch_embedding(x_spectral) #(batch, s`, dim)
-        x_pixel = self.pixel_patch_embedding(x_pixel) #(batch, image_size, dim)
+        x_pixel = x_pixel #(batch, image_size, dim)
 
         #3. local transformer
-        cls_tokens_spectral = repeat(self.cls_token_spectral, '() n d -> b n d', b = b) #[b,1,dim]
-        x_spectral = torch.cat((cls_tokens_spectral, x_spectral), dim = 1) #[b,s`+1,dim]
-        x_spectral = x_spectral + self.spectral_pos_embedding[:,:]
+        cls_tokens_pixel = self.cls_token_pixel.expand(x_pixel.shape[0], -1, -1)
 
-        cls_tokens_pixel = repeat(self.cls_token_pixel, '() n d -> b n d', b = b) #[b,1,dim]
         x_pixel = torch.cat((cls_tokens_pixel, x_pixel), dim = 1) #[b,image+1,dim]
-        x_pixel = x_pixel + self.pixel_pos_embedding[:,:]
+        x_pixel = x_pixel + self.pixel_pos_embedding[:,:] * self.pixel_pos_scale
+        # x_pixel = x_pixel + self.pixel_pos_embedding[:,:] 
+        x_pixel = self.dropout(x_pixel)
 
-        x_spectral = self.local_trans_spectral(x_spectral) #(batch, s`+1, dim)
         x_pixel = self.local_trans_pixel(x_pixel) #(batch, image_size+1, dim)
 
-        #4. cross transformer
-        x_spectral_cross, x_pixel_cross = self.cross_trans(x_spectral, x_pixel) #(batch, s, dim), (batch, image_size, dim)
-
-        #5. get spectral_pixel_feature
-        # avgpooling for eatch trans_result to get the real feature map for mlp
-        mean_spectral, mean_pixel = map(lambda temp : torch.mean(temp, dim=1)  , [x_spectral, x_pixel])
-        x_spectral_cross, x_pixel_cross = map(lambda temp : torch.mean(temp, dim=1)  , [x_spectral_cross, x_pixel_cross])
-        # x_feature = torch.concat([x_spectral, x_pixel, x_spectral_cross, x_pixel_cross], axis=1)
-
-        # logits_x = self.mlp_head(x_feature)
-        # logits_x = self.mlp_head(x_spectral)
-        logit_spectral = self.to_latent_spectral(x_spectral[:,0])
         logit_pixel = self.to_latent_pixel(x_pixel[:,0])
-        # logit_x = torch.concat([logit_spectral, logit_pixel, x_spectral_cross, x_pixel_cross], dim=-1)
 
-        # --- TODO: just for experiment ---
-        if self.params['net']['net_type'] == 'just_spectral':
-            logit_x = torch.concat([logit_spectral], dim=-1)
-        elif self.params['net']['net_type'] == 'just_pixel':
-            logit_x = torch.concat([logit_pixel], dim=-1)
-        elif self.params['net']['net_type'] == 'spectral_pixel':
-            logit_x = torch.concat([logit_spectral, logit_pixel], dim=-1)
-        elif self.params['net']['net_type'] == 'cross':
-            logit_x = torch.concat([x_spectral_cross, x_pixel_cross], dim=-1)
-        elif self.params['net']['net_type'] == 'spectral_pixel_cross':
-            logit_x = torch.concat([logit_spectral, logit_pixel, x_spectral_cross, x_pixel_cross], dim=-1)
-        elif self.params['net']['net_type'] == 'spectral_cross':
-            logit_x = torch.concat([logit_spectral, x_spectral_cross, x_pixel_cross], dim=-1)
-        else:
-            raise Exception('cross wrong net type.')
-        # --- TODO: just for experiment ---
+        logit_x = logit_pixel 
 
-        return  self.mlp_head(logit_x), logit_spectral, logit_pixel 
-        # return  self.mlp_head(logit_x), mean_spectral, mean_pixel 
+        return  self.mlp_head(logit_x), 0, 0 
 
         
 if __name__ == '__main__':
