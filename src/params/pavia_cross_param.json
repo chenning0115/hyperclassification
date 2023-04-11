@@ -11,7 +11,7 @@
         "spectral_size": 30
     },
     "net": {
-        "trainer" : "cross_trainer",
+        "trainer" : "contra_cross_transformer",
         "net_type": "just_pixel",
 	    "mlp_head_dim": 64,
         "depth":1,
@@ -24,6 +24,10 @@
         "epochs": 100,
         "lr":0.001,
         "weight_decay":0
+    },
+    "aug":{
+        "type":"shrink",
+        "size":5
     }
 }
 

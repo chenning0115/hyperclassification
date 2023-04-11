@@ -1,22 +1,36 @@
 import torch
+from torch.functional import Tensor
 from torchvision import transforms
+import torch.nn.functional as F
 '''
 这个是对原patch进行缩小，参数size小于原patch的size
 '''
-class ShrinkAugment:
+
+class Augment:
     def __init__(self,params) -> None:
-        self.size=params.get("size",3)
+        self.name=params['type']
 
     def do(self,data):
+        return self.real_do(data)
+    
+    def real_do(self,data)->Tensor:
+        pass
+
+class ShrinkAugment(Augment):
+    def __init__(self,params) -> None:
+        super(ShrinkAugment,self).__init__(params)
+        self.size=params.get("size",3)
+
+    def real_do(self,data):
         # data: batch,channel,patch_size,patch_size
         batch_size=data.size(0)
         channel_num=data.size(1)
         center=int(data.size(2)/2)
         margin=int((self.size-1)/2)
-        newdata=torch.zeros(batch_size,channel_num,self.size,self.size)
-        for i in range(batch_size):
-            newdata[i]=data[i,:,center-margin:center+margin+1]
-        return data,newdata
+        newdata=torch.zeros(data.size())
+        newdata[:,:,center-margin:center+margin+1,center-margin:center+margin+1]=data[:,:,center-margin:center+margin+1,center-margin:center+margin+1]
+        
+        return newdata
 
 '''
 使用高斯核对每个spectrum进行模糊，参数包括kernel_size和sigma_square
@@ -25,20 +39,17 @@ class ShrinkAugment:
 "kernel_size":5
 "sigma_sq":2.25
 '''
-class GaussAugment:
+class GaussAugment(Augment):
     def __init__(self,params) -> None:
+        super(GaussAugment,self).__init__(params)
         self.kernel_size=params.get("kernel_size",3)
         self.sigma_sq=params.get("sigma_sq",2.25)
 
-    def do(self,data):
+    def real_do(self,data):
         # data: batch,channel,patch_size,patch_size
-        batch_size=data.size(0)
-        channel_num=data.size(1)
-        newdata=torch.zeros(data.shape())
         t=transforms.GaussianBlur(self.kernel_size,self.sigma_sq)
-        for i in range(batch_size):
-            newdata[i]=t(data[i])
-        return data,newdata
+        newdata=t(data)
+        return newdata
 
 '''
 使用在spectrum维的gaussblur
@@ -46,8 +57,9 @@ class GaussAugment:
 "kernel_size":5
 "sigma_sq":2.25
 '''
-class SpecFilterAugment:
+class SpecFilterAugment(Augment):
     def __init__(self,params) -> None:
+        super(SpecFilterAugment,self).__init__(params)
         self.kernel_size=params.get("kernel_size",3)
         self.sigma_sq=params.get("sigma_sq",2.25)
         self.margin=self.kernel_size/2
@@ -55,7 +67,7 @@ class SpecFilterAugment:
         for i in range(self.margin+1):
             self.filter[i]=self.filter[self.kernel_size-1-i]=-1*torch.exp((self.margin-i)*(self.margin-i)/2/self.sigma_sq)/torch.sqrt(2*torch.PI*self.sigma_sq)
 
-    def do(self,data):
+    def real_do(self,data):
         # data: batch,channel,patch_size,patch_size
         batch_size=data.size(0)
         channel_num=data.size(1)
@@ -72,11 +84,56 @@ class SpecFilterAugment:
                         newdata[i][j][k][l]=torch.dot(self.filter,padding_data[j][k][l:l+self.kernel_size])
         data=torch.transpose(data,(0,3,1,2))
         newdata=torch.transpose(newdata,(0,3,1,2))
-        return data,newdata
+        return newdata
 
+class FlipAugment(Augment):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+        self.mirror=params.get('mirror','horizontal')
+    
+    def real_do(self,data):# b c h w
+        if self.mirror=='horizontal':
+            return transforms.functional.hflip(data)
+        else:
+            return transforms.functional.vflip(data)
+
+class RotateAugment(Augment):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+        self.angle=params.get('angle',90) # 默认90，也可以是270，逆时针为正
+
+    def real_do(self, data):
+        newdata=torch.transpose(data,2,3)
+        if self.angle==270:
+            return transforms.functional.hflip(newdata)
+        else:
+            return transforms.functional.vflip(newdata)
+
+class DownSampleAugment(Augment):
+    # 降采样
+    def __init__(self, params) -> None:
+        super().__init__(params)
+        self.scale=params.get("scale",2)
+
+    def real_do(self, data):
+        x=F.interpolate(data,scale_factor=(1./self.scale,1./self.scale))
+        return F.interpolate(x,size=(data.size(2),data.size(3)))
+
+class MaskAugment(Augment):# 3D随机mask,指的是mask大小随机再加left_top点随机
+    def __init__(self, params) -> None:
+        super().__init__(params)
+        self.spc_fac=params
+
+        
 
 def do_augment(params,data):# 增强也有一系列参数呢，比如multiscale的尺寸、mask的大小、Gaussian噪声的参数等
     if params['type']=='shrink':
         return ShrinkAugment(params).do(data)
     if params['type']=='Gauss':
         return GaussAugment(params).do(data)
+    if params['type']=='Flip':
+        return FlipAugment(params).do(data)
+    if params['type']=='Rotate':
+        return RotateAugment(params).do(data)
+    if params["type"]=='DownSample':
+        return DownSampleAugment(params).do(data)

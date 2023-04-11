@@ -11,6 +11,7 @@ from models import conv3d
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
+from augment import do_augment
 
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
@@ -82,6 +83,7 @@ class BaseTrainer(object):
         self.train_params = params['train']
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.evalator = HSIEvaluation(param=params)
+        self.aug=params.get("aug",None)
 
         self.net = None
         self.criterion = None
@@ -105,6 +107,9 @@ class BaseTrainer(object):
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
                 outputs = self.net(data)
+                if self.aug:
+                    newdata=do_augment(self.aug,data).to(self.device)
+                    outputs=outputs+(self.net(newdata)[1],)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -179,8 +184,8 @@ class CrossTransformerTrainer(BaseTrainer):
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
 class ContraCrossTransformerTrainer(BaseTrainer):
-    def __init__(self, params) -> None:
-        super().__init__(params)
+    def __init__(self, params):
+        super(ContraCrossTransformerTrainer,self).__init__(params)
 
     def real_init(self):
         # net

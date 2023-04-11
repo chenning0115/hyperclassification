@@ -278,7 +278,7 @@ class HSINet(nn.Module):
         logit_x = logit_pixel 
 
         # return  self.mlp_head(logit_x), 0, 0 
-        return  self.mlp_head(logit_x) #[batch_size,num_class]
+        return  self.mlp_head(logit_x),x_pixel[:,0] #[batch_size,num_class]
 
         
 if __name__ == '__main__':
