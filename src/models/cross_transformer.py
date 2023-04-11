@@ -249,7 +249,7 @@ class HSINet(nn.Module):
 
     def forward(self, x):
         '''
-        x: (batch, p, w, h), s=spectral, w=weigth, h=height
+        x: (batch, s, w, h), s=spectral, w=weigth, h=height
 
         '''
         x_pixel = x 
@@ -277,7 +277,8 @@ class HSINet(nn.Module):
 
         logit_x = logit_pixel 
 
-        return  self.mlp_head(logit_x), 0, 0 
+        # return  self.mlp_head(logit_x), 0, 0 
+        return  self.mlp_head(logit_x) #[batch_size,num_class]
 
         
 if __name__ == '__main__':
