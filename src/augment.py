@@ -124,6 +124,13 @@ class MaskAugment(Augment):# 3D随机mask,指的是mask大小随机再加left_to
         super().__init__(params)
         self.spc_fac=params
 
+class SameAugment(Augment):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+        
+    def real_do(self, data) -> Tensor:
+        return data
+
         
 
 def do_augment(params,data):# 增强也有一系列参数呢，比如multiscale的尺寸、mask的大小、Gaussian噪声的参数等
@@ -137,3 +144,5 @@ def do_augment(params,data):# 增强也有一系列参数呢，比如multiscale�
         return RotateAugment(params).do(data)
     if params["type"]=='DownSample':
         return DownSampleAugment(params).do(data)
+    if params['type'] == 'Same':
+        return SameAugment(params).do(data)

@@ -219,7 +219,7 @@ class HSINet(nn.Module):
         depth = net_params.get("depth", 1)
         heads = net_params.get("heads", 8)
         mlp_dim = net_params.get("mlp_dim", 8)
-        dropout = net_params.get("dropout", 0.1)
+        dropout = net_params.get("dropout", 0)
         conv2d_out = 64
         dim_heads = dim
         mlp_head_dim = dim
@@ -265,11 +265,10 @@ class HSINet(nn.Module):
 
         #3. local transformer
         cls_tokens_pixel = self.cls_token_pixel.expand(x_pixel.shape[0], -1, -1)
-
         x_pixel = torch.cat((cls_tokens_pixel, x_pixel), dim = 1) #[b,image+1,dim]
         x_pixel = x_pixel + self.pixel_pos_embedding[:,:] * self.pixel_pos_scale
         # x_pixel = x_pixel + self.pixel_pos_embedding[:,:] 
-        x_pixel = self.dropout(x_pixel)
+        # x_pixel = self.dropout(x_pixel)
 
         x_pixel = self.local_trans_pixel(x_pixel) #(batch, image_size+1, dim)
 

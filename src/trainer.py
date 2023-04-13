@@ -109,7 +109,9 @@ class BaseTrainer(object):
                 outputs = self.net(data)
                 if self.aug:
                     newdata=do_augment(self.aug,data).to(self.device)
-                    outputs=outputs+(self.net(newdata)[1],)
+                    outputs_1 = self.net(newdata)
+                    outputs= list(outputs) + [outputs_1[1]]
+                    # print(outputs[1], outputs[2])
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -199,6 +201,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         '''
         targets: [batch]  dtype is int
         '''
+        # print(A_vecs, B_vecs)
         A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
         B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
         matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
@@ -206,6 +209,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         # print("logits,", tempa.max(), tempa.min())
         matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
         tempb = matrix_softmax.detach().cpu().numpy()
+        print(np.diag(tempb))
         # print("softmax,", tempb.max(), tempb.min())
         matrix_log = -1 * torch.log(matrix_softmax)
         # here just use dig part
@@ -222,8 +226,9 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         # tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
         matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
-        # tempb = matrix_softmax.detach().cpu().numpy()
-        # print("softmax,", tempb.max(), tempb.min())
+        tempb = matrix_softmax.detach().cpu().numpy()
+        # print("softmax,", tempb)
+        # print("label,", targets)
         matrix_log = -1 * torch.log(matrix_softmax)
 
         l = targets.shape[0]
@@ -245,9 +250,9 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         logits, A_vecs, B_vecs = outputs
         
         weight_nce = 0.1
-        loss_nce_1 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
-        # loss_nce_2 = self.infoNCE(B_vecs, B_vecs, target) * weight_nce
-        loss_nce = loss_nce_1 
+        # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
+        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        loss_nce = loss_nce_2
         loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
 
         print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
