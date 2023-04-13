@@ -38,6 +38,41 @@ class DataSetIter(torch.utils.data.Dataset):
         return self.size
 
 
+class ContraDataSetIter(torch.utils.data.Dataset):
+    def __init__(self, _base_img, _base_labels, train_index2pos,test_index2pos, _margin, _patch_size, _append_dim) -> None:
+        self.base_img = _base_img #全量数据包括margin (145+2margin * 145+2margin * spe)
+        self.base_labels = _base_labels #全量数据无margin (145 * 145)
+        self.train_index2pos = train_index2pos #训练数据 index -> (x, y) 对应margin后base_img的中心点坐标
+        self.train_size = len(train_index2pos)
+        self.test_index2pos=test_index2pos
+        self.test_size=len(test_index2pos)
+
+        self.margin = _margin
+        self.patch_size = _patch_size
+        self.append_dim = _append_dim
+    
+    def __getitem__(self, index):
+        tr_start_x, tr_start_y = self.train_index2pos[index%self.train_size]
+        te_start_x, te_start_y = self.test_index2pos[index]
+        tr_patch = self.base_img[tr_start_x:tr_start_x+2*self.margin+1 , tr_start_y:tr_start_y+2*self.margin+1,:]
+        te_patch = self.base_img[te_start_x:te_start_x+2*self.margin+1 , te_start_y:te_start_y+2*self.margin+1,:]
+        if self.append_dim:
+            tr_patch = np.expand_dims(tr_patch, 0) # [channel=1, h, w, spe]
+            tr_patch = tr_patch.transpose((0,3,1,2)) # [c, spe, h, w]
+            te_patch = np.expand_dims(te_patch, 0) # [channel=1, h, w, spe]
+            te_patch = te_patch.transpose((0,3,1,2)) # [c, spe, h, w]
+        else:
+            tr_patch = tr_patch.transpose((2, 0, 1)) #[spe, h, w]
+            te_patch = te_patch.transpose((2, 0, 1)) #[spe, h, w]
+        label = self.base_labels[tr_start_x, tr_start_y] - 1
+
+        # print(index, patch.shape, start_x, start_y, label)
+        return torch.FloatTensor(tr_patch), torch.LongTensor(label.reshape(-1))[0],torch.FloatTensor(te_patch),-1 # 从test集合中取出的，标签记作-1，训练时不使用
+
+    def __len__(self):
+        return self.test_size
+
+
 class HSIDataLoader(object):
     def __init__(self, param) -> None:
         self.data_param = param['data']
@@ -245,7 +280,8 @@ class HSIDataLoader(object):
         print("test len : %s" % len(test_index2pos ))
         print("all len: %s" % len(all_index2pos ))
 
-        trainset = DataSetIter(base_img, labels, train_index2pos, margin, patch_size, self.append_dim) 
+        # trainset = DataSetIter(base_img, labels, train_index2pos, margin, patch_size, self.append_dim) 
+        trainset=ContraDataSetIter(base_img,labels,train_index2pos,test_index2pos,margin,patch_size,self.append_dim)
         testset = DataSetIter(base_img, labels, test_index2pos , margin, patch_size, self.append_dim) 
         allset = DataSetIter(base_img, labels, all_index2pos, margin, patch_size, self.append_dim) 
         train_loader = torch.utils.data.DataLoader(dataset=trainset,

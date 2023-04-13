@@ -25,8 +25,13 @@
         "lr":0.001,
         "weight_decay":0
     },
-    "aug":{
-        "type":"Same"
+    "aug1":{
+        "type":"Flip",
+        "mirror":"vertical"
+    },
+    "aug2":{
+        "type":"Rotate",
+        "angle":90
     }
 }
 

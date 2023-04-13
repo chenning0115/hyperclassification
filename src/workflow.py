@@ -56,7 +56,7 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'pavia_contra_same.json',
+    'pavia_contra_flip_rotate.json',
 ]
 
 def check_convention(name):
@@ -66,7 +66,7 @@ def check_convention(name):
     return False
 
 def run_all():
-    save_path_prefix = './res/'
+    save_path_prefix = '../res/'
     if not os.path.exists(save_path_prefix):
         os.makedirs(save_path_prefix)
     for name in include_path:

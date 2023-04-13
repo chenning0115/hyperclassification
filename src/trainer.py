@@ -83,7 +83,6 @@ class BaseTrainer(object):
         self.train_params = params['train']
         self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
         self.evalator = HSIEvaluation(param=params)
-        self.aug=params.get("aug",None)
 
         self.net = None
         self.criterion = None
@@ -107,11 +106,6 @@ class BaseTrainer(object):
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
                 outputs = self.net(data)
-                if self.aug:
-                    newdata=do_augment(self.aug,data).to(self.device)
-                    outputs_1 = self.net(newdata)
-                    outputs= list(outputs) + [outputs_1[1]]
-                    # print(outputs[1], outputs[2])
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -169,6 +163,61 @@ class BaseTrainer(object):
                 y_test = np.concatenate((y_test, labels))
         return y_pred_test, y_test
 
+class BaseContraTrainer(BaseTrainer):
+    def __init__(self,params):
+        super(BaseContraTrainer,self).__init__(params)
+        self.aug1=params.get("aug1",None)
+        self.aug2=params.get("aug2",None)
+    
+    def train(self, train_loader, test_loader=None):
+        epochs = self.params['train'].get('epochs', 100)
+        total_loss = 0
+        epoch_avg_loss = utils.AvgrageMeter()
+        for epoch in range(epochs):
+            self.net.train()
+            epoch_avg_loss.reset()
+            for i, (label_data, real_target,unlabel_data,minus_1) in enumerate(train_loader):
+                label_data, real_target,unlabel_data,minus_1 = label_data.to(self.device), real_target.to(self.device),unlabel_data.to(self.device),minus_1.to(self.device)
+                '''
+                label_data、unlabelled_data大小：
+                    batch_size channel height width
+                real_target、-1向量大小：
+                    batch_size
+                是否需要做一个shuffle？其实做不做都行吧，先不做，之后向陈总请教
+                '''
+                data=torch.cat([label_data,unlabel_data],dim=0)
+                target=torch.cat([real_target,minus_1],dim=0)
+                data1=do_augment(self.aug1,data).to(self.device)
+                data2=do_augment(self.aug2,data).to(self.device)
+                outputs1 = self.net(data1)
+                outputs2 = self.net(data2)
+                outputs=outputs1+(outputs2[1],)
+                loss = self.get_loss(outputs, target)
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip)
+                self.optimizer.step()
+                # batch stat
+                total_loss += loss.item()
+                epoch_avg_loss.update(loss.item(), data.shape[0])
+            recorder.append_index_value("epoch_loss", epoch + 1, epoch_avg_loss.get_avg())
+            print('[Epoch: %d]  [epoch_loss: %.5f]  [all_epoch_loss: %.5f] [current_batch_loss: %.5f] [batch_num: %s]' % (epoch + 1,
+                                                                             epoch_avg_loss.get_avg(), 
+                                                                             total_loss / (epoch + 1),
+                                                                             loss.item(), epoch_avg_loss.get_num()))
+            # 一定epoch下进行一次eval
+            if test_loader and (epoch+1) % 10 == 0:
+                y_pred_test, y_test = self.test(test_loader)
+                temp_res = self.evalator.eval(y_test, y_pred_test)
+                recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
+                recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
+                recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
+                print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
+            
+        print('Finished Training')
+        return True
+
+
 
 class CrossTransformerTrainer(BaseTrainer):
     def __init__(self, params):
@@ -185,7 +234,7 @@ class CrossTransformerTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
-class ContraCrossTransformerTrainer(BaseTrainer):
+class ContraCrossTransformerTrainer(BaseContraTrainer):
     def __init__(self, params):
         super(ContraCrossTransformerTrainer,self).__init__(params)
 
@@ -197,19 +246,22 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
     
-    def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
+    def infoNCE_diag(self, A_vecs, B_vecs,mask, temperature=10):
         '''
         targets: [batch]  dtype is int
+        mask: [batch] 元素只有01，分别表示labelled数据和unlabelled数据。前者应该被摒弃
         '''
         # print(A_vecs, B_vecs)
+        mask=mask.reshape(A_vecs.size(0),-1)
         A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
         B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
         matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
         tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
-        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
+        mask_mat=mask*mask.transpose(0,1)
+        matrix_softmax = torch.softmax(matrix_logits, dim=1)*mask_mat # softmax by dim=1
         tempb = matrix_softmax.detach().cpu().numpy()
-        print(np.diag(tempb))
+        # print(np.diag(tempb))
         # print("softmax,", tempb.max(), tempb.min())
         matrix_log = -1 * torch.log(matrix_softmax)
         # here just use dig part
@@ -245,15 +297,30 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         '''
             A_vecs: [batch, dim]
             B_vecs: [batch, dim]
-            logits: [batch, class_num]
+            logits: [batch(取值class_num)]
+            target: [batch(取值class_num（包含-1）)]
+            target里面包含-1的，是unlabel_data 通过mask完成两部分分开的计算
         '''
         logits, A_vecs, B_vecs = outputs
+        # print("A_vecs Size:")
+        # print(A_vecs.size())
+        # print("B_vecs Size:")
+        # print(B_vecs.size())
+        # print("logits Size:")
+        # print(logits.size())
+        # print("targets Size:")
+        # print(target.size())
+        batch=logits.size(0)
+        dim=A_vecs.size(1)
+        mask=-1*torch.ones(batch).to(self.device)
+        unlabel_idx=target.eq(mask).int()
+        label_idx=target.ne(mask).int()
         
         weight_nce = 0.1
-        # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
-        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
-        loss_nce = loss_nce_2
-        loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
+        loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs,mask=unlabel_idx) * weight_nce
+        # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        loss_nce = loss_nce_1
+        loss_main = nn.CrossEntropyLoss()(label_idx.reshape(batch,1)*logits, label_idx*target) * (1 - weight_nce)
 
         print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 

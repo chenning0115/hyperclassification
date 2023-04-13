@@ -1,6 +1,7 @@
 import os, sys
 import json, time
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class AvgrageMeter(object):
@@ -72,3 +73,21 @@ class HSIRecoder(object):
 
 # global recorder
 recorder = HSIRecoder()
+
+# draw the loss curve
+result_path='./res/pavia_contra_same.json_1681386847'
+def draw_curves(result_path):
+    with open(result_path+'.json','r') as fin:
+        file=json.loads(fin.read())
+    curve_list=['epoch_loss','train_oa','train_aa']
+    for name in curve_list:
+        x=file[name]['index']
+        y=file[name]['value']
+        plt.plot(x,y)
+        plt.title(name+' Curve')
+        plt.xlabel('index')
+        plt.savefig(result_path+name+'.png')
+        plt.clf()
+
+draw_curves(result_path=result_path)
+    
