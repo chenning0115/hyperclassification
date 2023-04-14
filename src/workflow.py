@@ -54,9 +54,12 @@ def train_convention_by_param(param):
 
 
 
-
+# batch_size=32,epoch500,lr=0.001,different augs
 include_path = [
-    'pavia_contra_flip_rotate.json',
+    'pavia_contra_same_downsample.json',
+    'pavia_contra_flip_downsample.json',
+    'pavia_contra_rotate_downsample.json',
+    'pavia_contra_rotate_flip.json',
 ]
 
 def check_convention(name):

@@ -252,21 +252,33 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         mask: [batch] 元素只有01，分别表示labelled数据和unlabelled数据。前者应该被摒弃
         '''
         # print(A_vecs, B_vecs)
-        mask=mask.reshape(A_vecs.size(0),-1)
+        batch_size=A_vecs.size(0)
         A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
         B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
-        matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
+        # A内部之间也有负样本，使用相乘提出
+        C_vecs=torch.cat([A_vecs,B_vecs],dim=0)
+        # matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
+        matrix_logits = torch.matmul(C_vecs, torch.transpose(C_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
         tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
         # mask_mat=mask*mask.transpose(0,1)
         # matrix_softmax = torch.softmax(matrix_logits, dim=1)*mask_mat # softmax by dim=1
-        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
+        matrix_exp = torch.exp(matrix_logits) # softmax by dim=1
+        sum_but_diag=torch.sum(matrix_exp,dim=1)-torch.diag(matrix_exp)
+        sum_but_diag=torch.Tensor.expand(sum_but_diag,(batch_size*2,batch_size*2))
+        matrix_softmax=matrix_exp.div(sum_but_diag)
         tempb = matrix_softmax.detach().cpu().numpy()
+        # diag=np.diag(tempb)
         # print(np.diag(tempb))
         # print("softmax,", tempb.max(), tempb.min())
         matrix_log = -1 * torch.log(matrix_softmax)
         # here just use dig part
-        loss_nce = torch.mean(torch.diag(matrix_log))
+        # 对于matrix_log，进行四分块，只取右上块的对角线，是正例
+        loss_nce=0.
+        for i in range(batch_size):
+            loss_nce+=matrix_log[i,batch_size+i]
+        # loss_nce = torch.mean(torch.diag(matrix_log))
+        loss_nce/=batch_size
         return loss_nce
 
     def infoNCE(self, A_vecs, B_vecs, targets, temperature=15):
@@ -292,7 +304,26 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         loss_nce = torch.sum(matrix_log * mask_matrix) / torch.sum(mask_matrix)
         return loss_nce
 
-
+    def test(self, test_loader):
+        """
+        provide test_loader, return test result(only net output)
+        """
+        count = 0
+        self.net.eval()
+        y_pred_test = 0
+        y_test = 0
+        for inputs, labels in test_loader:
+            inputs = inputs.to(self.device)
+            outputs = self.get_logits(self.net(inputs))
+            outputs = np.argmax(outputs.detach().cpu().numpy(), axis=1)
+            if count == 0:
+                y_pred_test = outputs
+                y_test = labels
+                count = 1
+            else:
+                y_pred_test = np.concatenate((y_pred_test, outputs))
+                y_test = np.concatenate((y_test, labels))
+        return y_pred_test, y_test
 
     def get_loss(self, outputs, target):
         '''
@@ -322,7 +353,7 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
         loss_nce = loss_nce_1
         loss_main = nn.CrossEntropyLoss()(label_idx.reshape(batch,1)*logits, label_idx*target) * (1 - weight_nce)
-
+        # loss_main=0.0 # 先不管crossEntropy
         # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 
         return loss_nce + loss_main   
