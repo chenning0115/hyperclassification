@@ -258,8 +258,9 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
         tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
-        mask_mat=mask*mask.transpose(0,1)
-        matrix_softmax = torch.softmax(matrix_logits, dim=1)*mask_mat # softmax by dim=1
+        # mask_mat=mask*mask.transpose(0,1)
+        # matrix_softmax = torch.softmax(matrix_logits, dim=1)*mask_mat # softmax by dim=1
+        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
         tempb = matrix_softmax.detach().cpu().numpy()
         # print(np.diag(tempb))
         # print("softmax,", tempb.max(), tempb.min())
@@ -322,7 +323,7 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         loss_nce = loss_nce_1
         loss_main = nn.CrossEntropyLoss()(label_idx.reshape(batch,1)*logits, label_idx*target) * (1 - weight_nce)
 
-        print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
+        # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 
         return loss_nce + loss_main   
 
