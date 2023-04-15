@@ -265,8 +265,8 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
         # matrix_softmax = torch.softmax(matrix_logits, dim=1)*mask_mat # softmax by dim=1
         matrix_exp = torch.exp(matrix_logits) # softmax by dim=1
         sum_but_diag=torch.sum(matrix_exp,dim=1)-torch.diag(matrix_exp)
-        sum_but_diag=torch.Tensor.expand(sum_but_diag,(batch_size*2,batch_size*2))
-        matrix_softmax=matrix_exp.div(sum_but_diag)
+        # sum_but_diag=torch.Tensor.expand(sum_but_diag,(batch_size*2,batch_size*2))
+        matrix_softmax=matrix_exp.div(sum_but_diag.reshape(-1,1))
         tempb = matrix_softmax.detach().cpu().numpy()
         # diag=np.diag(tempb)
         # print(np.diag(tempb))
@@ -334,25 +334,17 @@ class ContraCrossTransformerTrainer(BaseContraTrainer):
             target里面包含-1的，是unlabel_data 通过mask完成两部分分开的计算
         '''
         logits, A_vecs, B_vecs = outputs
-        # print("A_vecs Size:")
-        # print(A_vecs.size())
-        # print("B_vecs Size:")
-        # print(B_vecs.size())
-        # print("logits Size:")
-        # print(logits.size())
-        # print("targets Size:")
-        # print(target.size())
         batch=logits.size(0)
         dim=A_vecs.size(1)
         mask=-1*torch.ones(batch).to(self.device)
         unlabel_idx=target.eq(mask).int()
-        label_idx=target.ne(mask).int()
+        # label_idx=target.ne(mask).int()
         
-        weight_nce = 0.1
+        weight_nce = 0.01
         loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs,mask=unlabel_idx) * weight_nce
         # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
         loss_nce = loss_nce_1
-        loss_main = nn.CrossEntropyLoss()(label_idx.reshape(batch,1)*logits, label_idx*target) * (1 - weight_nce)
+        loss_main = nn.CrossEntropyLoss(ignore_index=-1)(logits, target) * (1 - weight_nce)
         # loss_main=0.0 # 先不管crossEntropy
         # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 
@@ -424,3 +416,14 @@ def get_trainer(params):
 
     assert Exception("Trainer not implemented!")
 
+# mat=torch.Tensor([[1,3,5],[2,4,7],[9,4,8]])
+# print(mat)
+# sum=mat.sum(dim=1)
+# print(sum)
+# diag=mat.diag()
+# print(diag)
+# sum_but_diag=sum-diag
+# print(sum_but_diag)
+# sum_but_diag=sum_but_diag.reshape(-1,1)
+# mat_d=mat.div(sum_but_diag)
+# print(mat_d)

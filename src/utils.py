@@ -75,7 +75,7 @@ class HSIRecoder(object):
 recorder = HSIRecoder()
 
 # draw the loss curve
-result_path='./res/pavia_contra_same.json_1681386847'
+result_path='./res/pavia_contra_'
 def draw_curves(result_path):
     with open(result_path+'.json','r') as fin:
         file=json.loads(fin.read())
@@ -89,5 +89,5 @@ def draw_curves(result_path):
         plt.savefig(result_path+name+'.png')
         plt.clf()
 
-draw_curves(result_path=result_path)
+# draw_curves(result_path=result_path)
     
