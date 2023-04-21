@@ -22,6 +22,10 @@
         "epochs": 500,
         "lr":0.001,
         "weight_decay":0
+    },
+    "augment":{
+        "type":"shrink",
+        "size":3
     }
 }
 

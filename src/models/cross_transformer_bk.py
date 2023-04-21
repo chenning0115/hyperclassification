@@ -247,7 +247,7 @@ class HSINet(nn.Module):
 
         self.dropout = nn.Dropout(0.1)
 
-    def encoder_block(self, x):
+    def forward(self, x):
         '''
         x: (batch, s, w, h), s=spectral, w=weigth, h=height
 
@@ -257,7 +257,6 @@ class HSINet(nn.Module):
         b, s, w, h = x_pixel.shape
         img = w * h
         x_pixel = self.conv2d_features(x_pixel)
-
         #1. reshape
         x_pixel = rearrange(x_pixel, 'b s w h-> b (w h) s') # (batch, s, w*h)
 
@@ -276,23 +275,9 @@ class HSINet(nn.Module):
         logit_pixel = self.to_latent_pixel(x_pixel[:,0])
 
         logit_x = logit_pixel 
-        reduce_x = torch.mean(x_pixel, dim=1)
-        
-        return logit_x, reduce_x
 
-
-    def forward(self, x, left=None, right=None):
-        '''
-        x: (batch, s, w, h), s=spectral, w=weigth, h=height
-
-        '''
-        logit_x, _ = self.encoder_block(x)
-        mean_left, mean_right = None, None
-        if left is not None and right is not None:
-            _, mean_left = self.encoder_block(left)
-            _, mean_right = self.encoder_block(right)
-
-        return  self.mlp_head(logit_x), mean_left, mean_right 
+        # return  self.mlp_head(logit_x), 0, 0 
+        return  self.mlp_head(logit_x),x_pixel[:,0] #[batch_size,num_class]
 
         
 if __name__ == '__main__':

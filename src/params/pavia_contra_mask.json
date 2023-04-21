@@ -26,7 +26,7 @@
         "weight_decay":0
     },
     "aug":{
-        "type":"Same"
+        "type":"Mask"
     }
 }
 

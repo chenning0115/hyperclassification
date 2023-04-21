@@ -15,11 +15,11 @@ def train_by_param(param):
     recorder.reset()
     # 1. 数据生成
     dataloader = HSIDataLoader(param)
-    train_loader, test_loader, all_loader = dataloader.generate_torch_dataset() 
+    train_loader, unlabel_loader, test_loader, all_loader = dataloader.generate_torch_dataset() 
 
     # 2. 训练和测试
     trainer = get_trainer(param)
-    trainer.train(train_loader, test_loader)
+    trainer.train(train_loader, unlabel_loader, test_loader)
     eval_res = trainer.final_eval(test_loader)
     # pred_all, y_all = trainer.test(all_loader)
     # pred_matrix = dataloader.reconstruct_pred(pred_all)
@@ -56,7 +56,7 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'pavia_contra_same.json',
+    'pavia_contra_mask.json',
 ]
 
 def check_convention(name):

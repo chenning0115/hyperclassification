@@ -16,7 +16,6 @@ from augment import do_augment
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
-import itertools
 
 
 class SKlearnTrainer(object):
@@ -92,21 +91,13 @@ class BaseTrainer(object):
         self.clip = 15
         self.real_init()
 
-        self.temp_unlabel_loader = None
     def real_init(self):
         pass
 
     def get_loss(self, outputs, target):
         return self.criterion(outputs, target)
-
-    def next_unalbel_data(self): 
-        index, (data, target) = next(self.temp_unlabel_loader)
-        print(index)
-        target = torch.ones_like(target) * -1
-        return data.to(self.device), target.to(self.device)
         
-    def train(self, train_loader, unlabel_loader, test_loader=None):
-        self.temp_unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
+    def train(self, train_loader, test_loader=None):
         epochs = self.params['train'].get('epochs', 100)
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
@@ -115,17 +106,12 @@ class BaseTrainer(object):
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                unlabel_data, unlabel_target = self.next_unalbel_data()
-                # print(data.shape, unlabel_data.shape, target.shape, unlabel_target.shape)
-                data = torch.concatenate([data, unlabel_data], dim=0)
-                target = torch.concatenate([target, unlabel_target], dim=0)
+                outputs = self.net(data)
                 if self.aug:
-                    left_data, right_data = do_augment(self.aug,data)
-                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs = self.net(data, left_data, right_data)
+                    newdata=do_augment(self.aug,data).to(self.device)
+                    outputs_1 = self.net(newdata)
+                    outputs= list(outputs) + [outputs_1[1]]
                     # print(outputs[1], outputs[2])
-                else:
-                    outputs = self.net(data, None, None)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -262,14 +248,12 @@ class ContraCrossTransformerTrainer(BaseTrainer):
             logits: [batch, class_num]
         '''
         logits, A_vecs, B_vecs = outputs
-        print(A_vecs.shape, B_vecs.shape)
         
-        weight_nce = 1
+        weight_nce = 0
         loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
         # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
         loss_nce = loss_nce_1
-
-        loss_main = nn.CrossEntropyLoss(ignore_index=-1)(logits, target) * (1 - weight_nce)
+        loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
 
         print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 

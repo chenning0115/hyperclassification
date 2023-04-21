@@ -2,21 +2,19 @@
     "data":{
         "data_sign":"Pavia",
         "diffusion_sign":false,
-        "patch_size":13,
+        "patch_size":9,
         "test_ratio":0.95,
-        "batch_size":512,
+        "batch_size":64,
         "num_classes":9,
-        "pca":30,
-        "dim_heads": 64,
-        "spectral_size": 30
+        "pca":103,
+        "spectral_size": 103
     },
     "net": {
         "trainer" : "contra_cross_transformer",
-        "net_type": "just_pixel",
-	    "mlp_head_dim": 64,
-        "depth":1,
+        "net_type": "cross",
+	    "mlp_head_dim": 128,
+        "depth":5,
         "dim":64,
-        "heads":8,
         "conv3d_kernal_size":[3,3,3],
         "conv3d_padding":[2,1,1]
     },
@@ -24,10 +22,6 @@
         "epochs": 100,
         "lr":0.001,
         "weight_decay":0
-    },
-    "aug":{
-        "type":"shrink",
-        "size":5
     }
 }
 

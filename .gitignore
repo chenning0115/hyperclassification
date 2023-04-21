@@ -1,6 +1,8 @@
-src/__pycache__
+src/__pycache__/*
 res
-src/models/__pycache__
+src/models/__pycache__/*
 *.pyc
 */*.pyc
 */*/*.pyc
+src/jupyter/.*
+src/data_provider/__pycache__/*
