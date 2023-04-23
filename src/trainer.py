@@ -275,6 +275,56 @@ class ContraCrossTransformerTrainer(BaseTrainer):
 
         return loss_nce + loss_main   
 
+class ContraConv3dTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+    
+    def real_init(self):
+        self.net=conv3d.Conv3d(self.params).to(self.device)
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
+        '''
+        targets: [batch]  dtype is int
+        '''
+        # print(A_vecs, B_vecs)
+        A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
+        B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
+        matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
+        tempa = matrix_logits.detach().cpu().numpy()
+        # print("logits,", tempa.max(), tempa.min())
+        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
+        tempb = matrix_softmax.detach().cpu().numpy()
+        # print(np.diag(tempb))
+        # print("softmax,", tempb.max(), tempb.min())
+        matrix_log = -1 * torch.log(matrix_softmax)
+        # here just use dig part
+        loss_nce = torch.mean(torch.diag(matrix_log))
+        return loss_nce
+    
+    def get_loss(self, outputs, target):
+        '''
+            A_vecs: [batch, dim]
+            B_vecs: [batch, dim]
+            logits: [batch, class_num]
+        '''
+        logits, A_vecs, B_vecs = outputs
+        print(A_vecs.shape, B_vecs.shape)
+        
+        weight_nce = 1
+        loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
+        # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        loss_nce = loss_nce_1
+
+        loss_main = nn.CrossEntropyLoss(ignore_index=-1)(logits, target) * (1 - weight_nce)
+
+        print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
+
+        return loss_nce + loss_main   
+
+
 class Conv1dTrainer(BaseTrainer):
     def __init__(self, params) -> None:
         super().__init__(params)
@@ -338,6 +388,8 @@ def get_trainer(params):
         return KNNTrainer(params)
     if trainer_type == "contra_cross_transformer":
         return ContraCrossTransformerTrainer(params)
+    if trainer_type == 'contra_conv3d':
+        return ContraConv3dTrainer(params)
 
     assert Exception("Trainer not implemented!")
 
