@@ -20,31 +20,42 @@ class Conv3d(torch.nn.Module):
         self.num_classes = data_params.get("num_classes", 16)
         self.patch_size = data_params.get("patch_size", 13)
 
-        a,b,c,d = 1,8,16,32
+        self.addLayer=nn.Sequential(collections.OrderedDict([
+            ('conv', nn.Conv3d(1,8,(3,3,3),(1,1,1),(1,1,1))),
+            ('relu', nn.ReLU())
+        ]))
+
+        a,b,c,d = 8,16,32,64
         self.layer1 = nn.Sequential(collections.OrderedDict([
           ('conv',    nn.Conv3d(a, b, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
           ('bn',      nn.BatchNorm3d(b)),
           ('relu',    nn.ReLU()),
-          ('avgpool', nn.Conv3d(b, b, (3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))),
+          ('conv2',    nn.Conv3d(b, b, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
+          ('bn',      nn.BatchNorm3d(b)),
+          ('maxpool', nn.MaxPool3d((2,2,2)))
         ]))
 
         self.layer2 = nn.Sequential(collections.OrderedDict([
           ('conv',    nn.Conv3d(b, c, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
           ('bn',      nn.BatchNorm3d(c)),
           ('relu',    nn.ReLU()),
-          ('avgpool', nn.Conv3d(c, c, (3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))),
+          ('conv2',    nn.Conv3d(c, c, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
+          ('bn',      nn.BatchNorm3d(c)),
+          ('maxpool', nn.MaxPool3d((2,2,2)))
         ]))
 
         self.layer3 = nn.Sequential(collections.OrderedDict([
           ('conv',    nn.Conv3d(c, d, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
           ('bn',      nn.BatchNorm3d(d)),
           ('relu',    nn.ReLU()),
-          ('avgpool', nn.Conv3d(d, d, (3, 3, 3), stride=(2, 1, 1), padding=(1, 1, 1))),
+          ('conv2',    nn.Conv3d(d, d, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
+          ('bn',      nn.BatchNorm3d(d)),
+          ('maxpool', nn.MaxPool3d((2,2,2)))
         ]))
 
         self.flatten = nn.Flatten()
-        # self.mlp_head = nn.LazyLinear(self.num_classes)
-        self.mlp_head=nn.Linear(70304,self.num_classes)
+        self.mlp_head = nn.LazyLinear(self.num_classes)
+        # self.mlp_head=nn.Linear(70304,self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -59,14 +70,14 @@ class Conv3d(torch.nn.Module):
         # 3d-cnn需要5维数据，目前只有四维
         # 增加一维
         x=torch.unsqueeze(x,1)
-        h = self.layer1(x)
+        h=self.addLayer(x)
+        h = self.layer1(h)
         h = self.layer2(h)
         h = self.layer3(h)
         h = self.flatten(h)
-        # print(h.size())
+        x=h
         h = self.mlp_head(h)
-        reduce_x = torch.mean(h, dim=1)
-        return h,reduce_x
+        return h,x
         
 
     def forward(self, x,left=None,right=None):

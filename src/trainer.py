@@ -290,6 +290,7 @@ class ContraConv3dTrainer(BaseTrainer):
         targets: [batch]  dtype is int
         '''
         # print(A_vecs, B_vecs)
+        # print(A_vecs.size())
         A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
         B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
         matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
@@ -311,7 +312,7 @@ class ContraConv3dTrainer(BaseTrainer):
             logits: [batch, class_num]
         '''
         logits, A_vecs, B_vecs = outputs
-        print(A_vecs.shape, B_vecs.shape)
+        # print(A_vecs.shape, B_vecs.shape)
         
         weight_nce = 1
         loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
