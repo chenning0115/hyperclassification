@@ -43,7 +43,8 @@ class Conv3d(torch.nn.Module):
         ]))
 
         self.flatten = nn.Flatten()
-        self.mlp_head = nn.LazyLinear(self.num_classes)
+        # self.mlp_head = nn.LazyLinear(self.num_classes)
+        self.mlp_head=nn.Linear(70304,self.num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv3d):
@@ -53,13 +54,30 @@ class Conv3d(torch.nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def forward(self, x):
+
+    def cnn_block(self,x):
+        # 3d-cnn需要5维数据，目前只有四维
+        # 增加一维
+        x=torch.unsqueeze(x,1)
         h = self.layer1(x)
         h = self.layer2(h)
         h = self.layer3(h)
         h = self.flatten(h)
+        # print(h.size())
         h = self.mlp_head(h)
-        return h
+        reduce_x = torch.mean(h, dim=1)
+        return h,reduce_x
+        
+
+    def forward(self, x,left=None,right=None):
+        # 添加左右两种增强，分别进行预测
+        logit_x, _ = self.cnn_block(x)
+        mean_left, mean_right = None, None
+        if left is not None and right is not None:
+            _, mean_left = self.cnn_block(left)
+            _, mean_right = self.cnn_block(right)
+
+        return  logit_x, mean_left, mean_right 
 
         
 if __name__ == '__main__':

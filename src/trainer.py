@@ -117,8 +117,8 @@ class BaseTrainer(object):
                 data, target = data.to(self.device), target.to(self.device)
                 unlabel_data, unlabel_target = self.next_unalbel_data()
                 # print(data.shape, unlabel_data.shape, target.shape, unlabel_target.shape)
-                data = torch.concatenate([data, unlabel_data], dim=0)
-                target = torch.concatenate([target, unlabel_target], dim=0)
+                data = torch.cat([data, unlabel_data], dim=0)
+                target = torch.cat([target, unlabel_target], dim=0)
                 if self.aug:
                     left_data, right_data = do_augment(self.aug,data)
                     left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
