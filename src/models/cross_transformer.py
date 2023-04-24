@@ -247,6 +247,18 @@ class HSINet(nn.Module):
 
         self.dropout = nn.Dropout(0.1)
 
+        mlp_dim1 = mlp_head_dim 
+        mlp_dim2 = mlp_dim1 * 2
+        self.classifier_mlp = nn.Sequential(
+            nn.Linear(mlp_dim1, mlp_dim2),
+            nn.BatchNorm1d(mlp_dim2),
+            nn.ReLU(),
+            nn.Linear(mlp_dim2, mlp_dim2),
+            nn.BatchNorm1d(mlp_dim2),
+            nn.ReLU(),
+            nn.Linear(mlp_dim2, num_classes),
+        )
+
     def encoder_block(self, x):
         '''
         x: (batch, s, w, h), s=spectral, w=weigth, h=height
@@ -281,6 +293,15 @@ class HSINet(nn.Module):
         return logit_x, reduce_x
 
 
+    def classifier(self, x):
+        '''
+        x: (batch, dim)
+        '''
+        x = x.detach() #禁止掉梯度
+        return self.classifier_mlp(x)
+
+
+
     def forward(self, x, left=None, right=None):
         '''
         x: (batch, s, w, h), s=spectral, w=weigth, h=height
@@ -293,6 +314,7 @@ class HSINet(nn.Module):
             _, mean_right = self.encoder_block(right)
 
         return  self.mlp_head(logit_x), mean_left, mean_right 
+        # return  self.classifier(logit_x), mean_left, mean_right 
 
         
 if __name__ == '__main__':

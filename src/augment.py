@@ -2,6 +2,7 @@ import torch
 from torch.functional import Tensor
 from torchvision import transforms
 import torch.nn.functional as F
+import numpy as np
 '''
 这个是对原patch进行缩小，参数size小于原patch的size
 '''
@@ -148,7 +149,42 @@ class XMaskAugment(Augment):
         left = data * left_mask
         right = data * right_mask
         return left, right
-            
+
+class XMaskAugment2(Augment):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+    def real_do(self, data) -> Tensor:
+        '''
+        data shape is [batch, spe, h, w]
+        左边 全部
+        右边 全部
+        '''
+        b, s, h, w = data.shape
+        left_mask = torch.zeros_like(data)
+        left_mask[:,list(range(0,s//2)),:,:] = 1
+        right_mask = torch.ones_like(data) - left_mask
+        left = data * left_mask
+        right = data * right_mask
+        return left, right
+
+class XMaskAugment3(Augment):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+    def real_do(self, data) -> Tensor:
+        '''
+        data shape is [batch, spe, h, w]
+        左边 随机一半
+        右边 随机一半
+        '''
+        b, s, h, w = data.shape
+        left_mask = torch.zeros_like(data)
+        left_mask[:,np.random.choice(list(range(s)), s//2) ,:,:] = 1
+        right_mask = torch.ones_like(data) - left_mask
+        left = data * left_mask
+        right = data * right_mask
+        return left, right           
 
 def do_augment(params,data):# 增强也有一系列参数呢，比如multiscale的尺寸、mask的大小、Gaussian噪声的参数等
     if params['type']=='shrink':

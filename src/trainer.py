@@ -8,6 +8,7 @@ from models import cross_transformer
 from models import conv1d
 from models import conv2d
 from models import conv3d
+from models import contra_conv
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
@@ -89,9 +90,10 @@ class BaseTrainer(object):
         self.net = None
         self.criterion = None
         self.optimizer = None
-        self.clip = 15
+        self.clip = 50
         self.real_init()
 
+        self.cur_epoch = 0
         self.temp_unlabel_loader = None
     def real_init(self):
         pass
@@ -108,19 +110,22 @@ class BaseTrainer(object):
     def train(self, train_loader, unlabel_loader, test_loader=None):
         self.temp_unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
         epochs = self.params['train'].get('epochs', 100)
+        use_unlabel = self.params['train'].get('use_unlabel', False)
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
         for epoch in range(epochs):
             self.net.train()
             epoch_avg_loss.reset()
+            self.cur_epoch = epoch
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                unlabel_data, unlabel_target = self.next_unalbel_data()
-                # print(data.shape, unlabel_data.shape, target.shape, unlabel_target.shape)
-                data = torch.concatenate([data, unlabel_data], dim=0)
-                target = torch.concatenate([target, unlabel_target], dim=0)
+                if use_unlabel:
+                    unlabel_data, unlabel_target = self.next_unalbel_data()
+                    # print(data.shape, unlabel_data.shape, target.shape, unlabel_target.shape)
+                    data = torch.concatenate([data, unlabel_data], dim=0)
+                    target = torch.concatenate([target, unlabel_target], dim=0)
                 if self.aug:
-                    left_data, right_data = do_augment(self.aug,data)
+                    left_data, right_data = do_augment(self.aug, data)
                     left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
                     outputs = self.net(data, left_data, right_data)
                     # print(outputs[1], outputs[2])
@@ -211,7 +216,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
     
-    def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
+    def infoNCE_diag(self, A_vecs, B_vecs, temperature=1, targets=None):
         '''
         targets: [batch]  dtype is int
         '''
@@ -219,12 +224,19 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
         B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
         matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
-        tempa = matrix_logits.detach().cpu().numpy()
+        # tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
         matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
-        tempb = matrix_softmax.detach().cpu().numpy()
-        # print(np.diag(tempb))
-        # print("softmax,", tempb.max(), tempb.min())
+
+        if np.random.randint(0,100) < 10 and targets is not None:
+            tempb = matrix_softmax.detach().cpu().numpy()
+            targets = targets.detach().cpu().numpy()
+            # tempb = list(np.diag(tempb))
+            # targets = list(np.diag(targets))
+            tempb = list(tempb[0])
+            targets = list(targets)
+            tt = zip(tempb, targets)
+            print(list(tt))
         matrix_log = -1 * torch.log(matrix_softmax)
         # here just use dig part
         loss_nce = torch.mean(torch.diag(matrix_log))
@@ -240,11 +252,17 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         # tempa = matrix_logits.detach().cpu().numpy()
         # print("logits,", tempa.max(), tempa.min())
         matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
-        tempb = matrix_softmax.detach().cpu().numpy()
-        # print("softmax,", tempb)
-        # print("label,", targets)
         matrix_log = -1 * torch.log(matrix_softmax)
 
+        if np.random.randint(0,100) < 10 and targets is not None:
+            tempb = matrix_softmax.detach().cpu().numpy()
+            ltargets = targets.detach().cpu().numpy()
+            # tempb = list(np.diag(tempb))
+            # targets = list(np.diag(targets))
+            tempb = list(tempb[0])
+            ltargets = list(ltargets)
+            tt = zip(tempb, ltargets)
+            print(list(tt))
         l = targets.shape[0]
         tb = torch.repeat_interleave(targets.reshape([-1,1]), l, dim=1)
         tc = torch.repeat_interleave(targets.reshape([1,-1]), l, dim=0)
@@ -262,11 +280,12 @@ class ContraCrossTransformerTrainer(BaseTrainer):
             logits: [batch, class_num]
         '''
         logits, A_vecs, B_vecs = outputs
-        print(A_vecs.shape, B_vecs.shape)
-        
-        weight_nce = 1
-        loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
-        # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+         
+        weight_nce = 0.1
+        if self.cur_epoch > 300:
+            weight_nce = 0
+        # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs, temperature=10, targets=target) * weight_nce
+        loss_nce_1 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
         loss_nce = loss_nce_1
 
         loss_main = nn.CrossEntropyLoss(ignore_index=-1)(logits, target) * (1 - weight_nce)
@@ -320,6 +339,58 @@ class Conv3dTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
+
+class ContraConv3dTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+    
+    def real_init(self):
+        self.net=contra_conv.Conv3d(self.params).to(self.device)
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
+        '''
+        targets: [batch]  dtype is int
+        '''
+        # print(A_vecs, B_vecs)
+        # print(A_vecs.size())
+        A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
+        B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
+        matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
+        tempa = matrix_logits.detach().cpu().numpy()
+        # print("logits,", tempa.max(), tempa.min())
+        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
+        tempb = matrix_softmax.detach().cpu().numpy()
+        # print(np.diag(tempb))
+        # print("softmax,", tempb.max(), tempb.min())
+        matrix_log = -1 * torch.log(matrix_softmax)
+        # here just use dig part
+        loss_nce = torch.mean(torch.diag(matrix_log))
+        return loss_nce
+    
+    def get_loss(self, outputs, target):
+        '''
+            A_vecs: [batch, dim]
+            B_vecs: [batch, dim]
+            logits: [batch, class_num]
+        '''
+        logits, A_vecs, B_vecs = outputs
+        # print(A_vecs.shape, B_vecs.shape)
+        
+        weight_nce = 1
+        loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
+        # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        loss_nce = loss_nce_1
+
+        loss_main = nn.CrossEntropyLoss(ignore_index=-1)(logits, target) * (1 - weight_nce)
+
+        print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
+
+        return loss_nce + loss_main   
+
+
 def get_trainer(params):
     trainer_type = params['net']['trainer']
     if trainer_type == "cross_trainer":
@@ -338,6 +409,8 @@ def get_trainer(params):
         return KNNTrainer(params)
     if trainer_type == "contra_cross_transformer":
         return ContraCrossTransformerTrainer(params)
+    if trainer_type == "contra_conv3d":
+        return ContraConv3dTrainer(params)
 
     assert Exception("Trainer not implemented!")
 
