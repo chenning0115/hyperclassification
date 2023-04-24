@@ -20,13 +20,13 @@ class Conv3d(torch.nn.Module):
         self.num_classes = data_params.get("num_classes", 16)
         self.patch_size = data_params.get("patch_size", 13)
 
-        # self.addLayer=nn.Sequential(collections.OrderedDict([
-        #     ('conv', nn.Conv3d(1,8,(3,3,3),(1,1,1),(1,1,1))),
-        #     ('relu', nn.ReLU())
-        # ]))
+        self.addLayer=nn.Sequential(collections.OrderedDict([
+            ('conv', nn.Conv3d(1,8,(3,3,3),(1,1,1),(1,1,1))),
+            ('relu', nn.ReLU())
+        ]))
 
-        # a,b,c,d = 8,16,32,64
-        a,b,c,d = 1,8,16,32
+        a,b,c,d = 8,16,32,64
+        # a,b,c,d = 1,8,16,32
         self.layer1 = nn.Sequential(collections.OrderedDict([
           ('conv',    nn.Conv3d(a, b, (3, 3, 3), stride=(1, 1, 1), padding=(1, 1, 1))),
           ('bn',      nn.BatchNorm3d(b)),
@@ -70,15 +70,15 @@ class Conv3d(torch.nn.Module):
     def cnn_block(self,x):
         # 3d-cnn需要5维数据，目前只有四维
         # 增加一维
-        # x=torch.unsqueeze(x,1)
-        # h=self.addLayer(x)
-        h = self.layer1(x)
+        x=torch.unsqueeze(x,1)
+        h=self.addLayer(x)
+        h = self.layer1(h)
         h = self.layer2(h)
         h = self.layer3(h)
         h = self.flatten(h)
-        # x=h
+        x=h
         h = self.mlp_head(h)
-        return h        
+        return h,x
 
     def forward(self, x,left=None,right=None):
         # 添加左右两种增强，分别进行预测
