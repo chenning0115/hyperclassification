@@ -110,7 +110,9 @@ class BaseTrainer(object):
                 if self.aug:
                     left_data, right_data = do_augment(self.aug,data)
                     left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs = self.net(left_data, right_data)
+                    outputs = self.net(left_data)
+                    outputs2=self.net (right_data)
+                    outputs= outputs+(outputs2[1],)
                 else:
                     outputs = self.net(data, None, None)
                 loss = self.get_loss(outputs, target)
@@ -145,9 +147,11 @@ class BaseTrainer(object):
                 if self.aug:
                     left_data, right_data = do_augment(self.aug,data)
                     left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs = self.net(left_data, right_data)
+                    outputs = self.net(left_data)
+                    outputs2=self.net (right_data)
+                    outputs= outputs+(outputs2[1],)
                 else:
-                    outputs = self.net(data, None, None)
+                    outputs = self.net(data)
                 target=torch.argmax(outputs[0],dim=1)
                 loss = self.get_loss(outputs,target)
                 self.optimizer.zero_grad()
@@ -217,12 +221,13 @@ class BaseTrainer(object):
         y_test = 0
         for inputs, labels in test_loader:
             inputs = inputs.to(self.device)
-            if self.aug:
-                left_data, right_data = do_augment(self.aug,inputs)
-                left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                outputs = self.get_logits(self.net(left_data, right_data))
-            else:
-                outputs = self.get_logits(self.net(inputs))
+            # if self.aug:
+                # left_data, right_data = do_augment(self.aug,inputs)
+                # left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
+                # outputs = self.get_logits(self.net(left_data, right_data))
+            # else:
+                # outputs = self.get_logits(self.net(inputs))
+            outputs = self.get_logits(self.net(inputs))
             outputs = np.argmax(outputs.detach().cpu().numpy(), axis=1)
             if count == 0:
                 y_pred_test = outputs
@@ -255,7 +260,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
 
     def real_init(self):
         # net
-        self.net = cross_transformer.ContraHSINet(self.params).to(self.device)
+        self.net = cross_transformer.HSINet(self.params).to(self.device)
         # optimizer
         self.lr = self.train_params.get('lr', 0.001)
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
