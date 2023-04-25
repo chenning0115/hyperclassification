@@ -286,7 +286,7 @@ class ContraHSINet(nn.Module):
 
         self.mlp_head =nn.Sequential(collections.OrderedDict([
             ('fc',nn.Linear(mlp_head_dim*2, num_classes))
-            ,('relu',nn.ReLU())
+            # ,('relu',nn.ReLU())
         ]))
         
         torch.nn.init.xavier_uniform_(self.mlp_head[0].weight)
