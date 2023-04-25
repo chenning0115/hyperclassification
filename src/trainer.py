@@ -98,20 +98,21 @@ class BaseTrainer(object):
         return self.criterion(outputs, target)
         
     def train(self, train_loader, test_loader=None):
-        epochs = self.params['train'].get('epochs', 100)
+        pre_epochs = self.params['train'].get('pretrain_epochs', 100)
+        contra_epochs=self.train_params.get('contra_epochs')
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
-        for epoch in range(epochs):
+        for epoch in range(pre_epochs):
             self.net.train()
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                outputs = self.net(data)
                 if self.aug:
-                    newdata=do_augment(self.aug,data).to(self.device)
-                    outputs_1 = self.net(newdata)
-                    outputs= list(outputs) + [outputs_1[1]]
-                    # print(outputs[1], outputs[2])
+                    left_data, right_data = do_augment(self.aug,data)
+                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
+                    outputs = self.net(left_data, right_data)
+                else:
+                    outputs = self.net(data, None, None)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -133,7 +134,42 @@ class BaseTrainer(object):
                 recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
                 recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
                 print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
-            
+        '''
+        下面使用伪label进行contra的训练，数据方面使用unlabel_data
+        '''
+        for epoch in range(contra_epochs):
+            self.net.train()
+            epoch_avg_loss.reset()
+            for i, (data, _) in enumerate(test_loader):
+                data = data.to(self.device)
+                if self.aug:
+                    left_data, right_data = do_augment(self.aug,data)
+                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
+                    outputs = self.net(left_data, right_data)
+                else:
+                    outputs = self.net(data, None, None)
+                target=torch.argmax(outputs[0],dim=1)
+                loss = self.get_loss(outputs,target)
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip)
+                self.optimizer.step()
+                # batch stat
+                total_loss += loss.item()
+                epoch_avg_loss.update(loss.item(), data.shape[0])
+            recorder.append_index_value("epoch_loss", epoch + 1, epoch_avg_loss.get_avg())
+            print('[Epoch: %d]  [epoch_loss: %.5f]  [all_epoch_loss: %.5f] [current_batch_loss: %.5f] [batch_num: %s]' % (epoch + 1,
+                                                                             epoch_avg_loss.get_avg(), 
+                                                                             total_loss / (epoch + 1),
+                                                                             loss.item(), epoch_avg_loss.get_num()))
+            # 一定epoch下进行一次eval
+            if test_loader and (epoch+1) % 10 == 0:
+                y_pred_test, y_test = self.test(test_loader)
+                temp_res = self.evalator.eval(y_test, y_pred_test)
+                recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
+                recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
+                recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
+                print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
         print('Finished Training')
         return True
 
@@ -142,6 +178,29 @@ class BaseTrainer(object):
         temp_res = self.evalator.eval(y_test, y_pred_test)
         return temp_res
 
+
+    def infoNCE(self, A_vecs, B_vecs, targets, temperature=15):
+        '''
+        targets: [batch]  dtype is int
+        '''
+        A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
+        B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
+        matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
+        # tempa = matrix_logits.detach().cpu().numpy()
+        # print("logits,", tempa.max(), tempa.min())
+        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
+        tempb = matrix_softmax.detach().cpu().numpy()
+        # print("softmax,", tempb)
+        # print("label,", targets)
+        matrix_log = -1 * torch.log(matrix_softmax)
+
+        l = targets.shape[0]
+        tb = torch.repeat_interleave(targets.reshape([-1,1]), l, dim=1)
+        tc = torch.repeat_interleave(targets.reshape([1,-1]), l, dim=0)
+        mask_matrix = tb.eq(tc).int()
+        # here just use dig part
+        loss_nce = torch.sum(matrix_log * mask_matrix) / torch.sum(mask_matrix)
+        return loss_nce
 
     def get_logits(self, output):
         if type(output) == tuple:
@@ -158,7 +217,12 @@ class BaseTrainer(object):
         y_test = 0
         for inputs, labels in test_loader:
             inputs = inputs.to(self.device)
-            outputs = self.get_logits(self.net(inputs))
+            if self.aug:
+                left_data, right_data = do_augment(self.aug,inputs)
+                left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
+                outputs = self.get_logits(self.net(left_data, right_data))
+            else:
+                outputs = self.get_logits(self.net(inputs))
             outputs = np.argmax(outputs.detach().cpu().numpy(), axis=1)
             if count == 0:
                 y_pred_test = outputs
@@ -191,11 +255,12 @@ class ContraCrossTransformerTrainer(BaseTrainer):
 
     def real_init(self):
         # net
-        self.net = cross_transformer.HSINet(self.params).to(self.device)
+        self.net = cross_transformer.ContraHSINet(self.params).to(self.device)
         # optimizer
         self.lr = self.train_params.get('lr', 0.001)
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
     
     def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
         '''
@@ -255,7 +320,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         loss_nce = loss_nce_2
         loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
 
-        print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
+        # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 
         return loss_nce + loss_main   
 

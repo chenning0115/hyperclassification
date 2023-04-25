@@ -7,6 +7,7 @@ from einops import rearrange
 from torch import nn
 import torch.nn.init as init
 from einops import rearrange, repeat
+import collections
 
 
 
@@ -222,7 +223,6 @@ class HSINet(nn.Module):
         dropout = net_params.get("dropout", 0)
         conv2d_out = 64
         dim_heads = dim
-        mlp_head_dim = dim
         
         image_size = patch_size * patch_size
 
@@ -241,11 +241,6 @@ class HSINet(nn.Module):
         self.cls_token_pixel = nn.Parameter(torch.randn(1, 1, dim))
         self.to_latent_pixel = nn.Identity()
 
-        self.mlp_head = nn.Linear(mlp_head_dim, num_classes)
-        torch.nn.init.xavier_uniform_(self.mlp_head.weight)
-        torch.nn.init.normal_(self.mlp_head.bias, std=1e-6)
-
-        self.dropout = nn.Dropout(0.1)
 
     def forward(self, x):
         '''
@@ -276,9 +271,34 @@ class HSINet(nn.Module):
 
         logit_x = logit_pixel 
 
-        # return  self.mlp_head(logit_x), 0, 0 
-        return  self.mlp_head(logit_x),x_pixel[:,0] #[batch_size,num_class]
+        return  x_pixel[:,0] #[batch_size,num_class]
 
+
+class ContraHSINet(nn.Module):
+    def __init__(self,params):
+        super().__init__()
+        self.backbone=HSINet(params)
+        
+        net_params = params['net']
+        data_params = params['data']
+        num_classes = data_params.get("num_classes", 16)
+        mlp_head_dim = net_params.get("dim", 64)
+
+        self.mlp_head =nn.Sequential(collections.OrderedDict([
+            ('fc',nn.Linear(mlp_head_dim*2, num_classes))
+            ,('relu',nn.ReLU())
+        ]))
+        
+        torch.nn.init.xavier_uniform_(self.mlp_head[0].weight)
+        torch.nn.init.normal_(self.mlp_head[0].bias, std=1e-6)
+
+        self.dropout = nn.Dropout(0.1)
+    
+    def forward(self,left,right):
+        h1=self.backbone(left)
+        h2=self.backbone(right)
+        h=torch.cat([h1,h2],dim=1)
+        return self.mlp_head(h),h1,h2
         
 if __name__ == '__main__':
     path_param = './params/cross_param.json'
