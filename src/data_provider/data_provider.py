@@ -246,6 +246,7 @@ class HSIDataLoader(object):
         print("all len: %s" % len(all_index2pos ))
 
         trainset = DataSetIter(base_img, labels, train_index2pos, margin, patch_size, self.append_dim) 
+        unlabelset=DataSetIter(base_img,labels,test_index2pos,margin, patch_size, self.append_dim)
         testset = DataSetIter(base_img, labels, test_index2pos , margin, patch_size, self.append_dim) 
         allset = DataSetIter(base_img, labels, all_index2pos, margin, patch_size, self.append_dim) 
         train_loader = torch.utils.data.DataLoader(dataset=trainset,
@@ -253,6 +254,11 @@ class HSIDataLoader(object):
                                                 shuffle=True,
                                                 drop_last=False
                                                 )
+        unlabel_loader=torch.utils.data.DataLoader(dataset=unlabelset,
+                                                batch_size=self.batch_size,
+                                                shuffle=False,
+                                                num_workers=0,
+                                                drop_last=False)
         test_loader = torch.utils.data.DataLoader(dataset=testset,
                                                 batch_size=self.batch_size,
                                                 shuffle=False,
@@ -266,7 +272,7 @@ class HSIDataLoader(object):
                                                 drop_last=False
                                                 )
          
-        return train_loader, test_loader, all_loader
+        return train_loader, unlabel_loader,test_loader, all_loader
 
        
 

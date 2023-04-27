@@ -24,7 +24,8 @@
         "pretrain_epochs":100,
         "contra_epochs": 100,
         "lr":0.001,
-        "weight_decay":0
+        "weight_decay":0,
+        "use_unlabel":true
     },
     "aug":{
         "type":"Mask"

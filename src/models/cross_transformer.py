@@ -223,6 +223,7 @@ class HSINet(nn.Module):
         dropout = net_params.get("dropout", 0)
         conv2d_out = 64
         dim_heads = dim
+        mlp_head_dim = dim
         
         image_size = patch_size * patch_size
 
@@ -246,17 +247,35 @@ class HSINet(nn.Module):
         torch.nn.init.normal_(self.mlp_head.bias, std=1e-6)
         self.dropout = nn.Dropout(0.1)
 
+        mlp_dim1 = mlp_head_dim 
+        mlp_dim2 = mlp_dim1 * 2
+        self.classifier_mlp = nn.Sequential(
+            nn.Linear(mlp_dim1, mlp_dim2),
+            nn.BatchNorm1d(mlp_dim2),
+            nn.ReLU(),
+            nn.Linear(mlp_dim2, mlp_dim2),
+            nn.BatchNorm1d(mlp_dim2),
+            nn.ReLU(),
+            nn.Linear(mlp_dim2, num_classes),
+        )
 
-    def forward(self, x):
+    def classifier(self, x):
+        '''
+        x: (batch, dim)
+        '''
+        x = x.detach() #禁止掉梯度
+        return self.classifier_mlp(x)
+
+    def encoder_block(self, x):
         '''
         x: (batch, s, w, h), s=spectral, w=weigth, h=height
-
         '''
         x_pixel = x 
 
         b, s, w, h = x_pixel.shape
         img = w * h
         x_pixel = self.conv2d_features(x_pixel)
+
         #1. reshape
         x_pixel = rearrange(x_pixel, 'b s w h-> b (w h) s') # (batch, s, w*h)
 
@@ -275,44 +294,19 @@ class HSINet(nn.Module):
         logit_pixel = self.to_latent_pixel(x_pixel[:,0])
 
         logit_x = logit_pixel 
-
-
-        return  self.mlp_head(logit_x),x_pixel[:,0] #[batch_size,num_class]
-
-
-class ContraHSINet(nn.Module):
-    def __init__(self,params):
-        super().__init__()
-        self.backbone=HSINet(params)
+        reduce_x = torch.mean(x_pixel, dim=1)
         
-        net_params = params['net']
-        data_params = params['data']
-        num_classes = data_params.get("num_classes", 16)
-        mlp_head_dim = net_params.get("dim", 64)
+        return logit_x, reduce_x
 
-        self.mlp_head =nn.Sequential(collections.OrderedDict([
-            ('fc',nn.Linear(mlp_head_dim*2, num_classes))
-            # ,('relu',nn.ReLU()) 分类器的最后一层不要加relu，会导致信息损失
-        ]))
-        
-        torch.nn.init.xavier_uniform_(self.mlp_head[0].weight)
-        torch.nn.init.normal_(self.mlp_head[0].bias, std=1e-6)
+    def forward(self, x,left=None,right=None):
+        '''
+        x: (batch, s, w, h), s=spectral, w=weigth, h=height
 
-        self.dropout = nn.Dropout(0.1)
-    
-    def forward(self,left,right):
-        h1=self.backbone(left)
-        h2=self.backbone(right)
-        h=torch.cat([h1,h2],dim=1)
-        return self.mlp_head(h),h1,h2
-        
-if __name__ == '__main__':
-    path_param = './params/cross_param.json'
-    with open(path_param, 'r') as fin:
-        param = json.loads(fin.read())
-    model = HSINet(param)
-    model.eval()
-    print(model)
-    input = torch.randn(3, 200, 9, 9)
-    y = model(input)
-    print(y.shape)
+        '''
+        logit_x, _ = self.encoder_block(x)
+        mean_left, mean_right = None, None
+        if left is not None and right is not None:
+            _, mean_left = self.encoder_block(left)
+            _, mean_right = self.encoder_block(right)
+
+        return  self.mlp_head(logit_x), mean_left, mean_right 
