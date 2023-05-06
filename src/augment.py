@@ -124,7 +124,7 @@ class DownSampleAugment(Augment):
 class MaskAugment(Augment):# 3D随机mask,指的是mask大小随机再加left_top点随机
     def __init__(self, params) -> None:
         super().__init__(params)
-        self.max_ratio=params['aug']['max_ratio']
+        self.max_ratio=params['max_ratio']
 
     def rand_mask(self,data):
         b,s,h,w=data.size()
