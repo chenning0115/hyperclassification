@@ -111,6 +111,7 @@ class BaseTrainer(object):
         contra_epochs=self.train_params.get('contra_epochs')
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
+        weight=self.train_params.get('weight',0.1)
         '''
         第一阶段使用原始data也过一遍backbone，然后去做CE。
         '''
@@ -169,13 +170,13 @@ class BaseTrainer(object):
                 # 都过infoNCE，但unlabel不过ce，只有labelled过ce
                 # print(outputs[0].size())
                 target[label_batch:]=torch.argmax(outputs[0][label_batch:,:],dim=1)
-                loss1=self.infoNCE(outputs[1],outputs[2],target)*0.1
+                loss1=self.infoNCE(outputs[1],outputs[2],target)*weight
                 # logit_mask=torch.ones_like(outputs[0])
                 # logit_mask[label_batch:,:]=0
                 # target_mask=torch.ones_like(target)
                 # target_mask[label_batch:]=0
                 target[label_batch:]=-1
-                loss2=nn.CrossEntropyLoss(ignore_index=-1)(outputs[0], target)*0.9
+                loss2=nn.CrossEntropyLoss(ignore_index=-1)(outputs[0], target)*(1-weight)
                 loss = loss1+loss2
                 self.optimizer.zero_grad()
                 loss.backward()
