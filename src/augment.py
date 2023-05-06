@@ -2,6 +2,8 @@ import torch
 from torch.functional import Tensor
 from torchvision import transforms
 import torch.nn.functional as F
+import random
+import math
 '''
 这个是对原patch进行缩小，参数size小于原patch的size
 '''
@@ -122,7 +124,28 @@ class DownSampleAugment(Augment):
 class MaskAugment(Augment):# 3D随机mask,指的是mask大小随机再加left_top点随机
     def __init__(self, params) -> None:
         super().__init__(params)
-        self.spc_fac=params
+        self.max_ratio=params['aug']['max_ratio']
+
+    def rand_mask(self,data):
+        b,s,h,w=data.size()
+        s_len=math.floor((1-random.random()*self.max_ratio)*s)
+        s_o=random.randint(0,s_len-1)
+        h_len=math.floor((1-random.random()*self.max_ratio)*h)
+        h_o=random.randint(0,h_len-1)
+        w_len=math.floor((1-random.random()*self.max_ratio)*w)
+        w_o=random.randint(0,w_len-1)
+        return s_o,h_o,w_o,s-s_len,h-h_len,w-w_len # 返回mask起始原点，以及三个维度上的mask长度
+
+    def real_do(self,data)->Tensor:
+        b,s,h,w=data.size()
+        s_o1,h_o1,w_o1,s_m1,h_m1,w_m1=self.rand_mask(data)
+        s_o2,h_o2,w_o2,s_m2,h_m2,w_m2=self.rand_mask(data)
+        left_mask=torch.ones_like(data)
+        left_mask[:,s_o1:s_o1+s_m1,h_o1:h_o1+h_m1,w_o1:w_o1+w_m1]=0
+        right_mask=torch.ones_like(data)
+        right_mask[:,s_o2:s_o2+s_m2,h_o2:h_o2+h_m2,w_o2:w_o2+w_m2]=0
+        return data*left_mask,data*right_mask
+        
 
 class SameAugment(Augment):
     def __init__(self, params) -> None:
@@ -165,3 +188,5 @@ def do_augment(params,data):# 增强也有一系列参数呢，比如multiscale�
         return SameAugment(params).do(data)
     if params['type'] == 'Mask':
         return XMaskAugment(params).do(data)
+    if params['type'] == '3DMask':
+        return MaskAugment(params).do(data)
