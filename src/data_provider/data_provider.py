@@ -245,6 +245,8 @@ class HSIDataLoader(object):
         print("test len : %s" % len(test_index2pos ))
         print("all len: %s" % len(all_index2pos ))
 
+        multi=self.data_param.get('unlabelled_multiple',1)
+
         trainset = DataSetIter(base_img, labels, train_index2pos, margin, patch_size, self.append_dim) 
         unlabelset=DataSetIter(base_img,labels,test_index2pos,margin, patch_size, self.append_dim)
         testset = DataSetIter(base_img, labels, test_index2pos , margin, patch_size, self.append_dim) 
@@ -255,7 +257,7 @@ class HSIDataLoader(object):
                                                 drop_last=False
                                                 )
         unlabel_loader=torch.utils.data.DataLoader(dataset=unlabelset,
-                                                batch_size=self.batch_size,
+                                                batch_size=int(self.batch_size*multi),
                                                 shuffle=False,
                                                 num_workers=0,
                                                 drop_last=False)

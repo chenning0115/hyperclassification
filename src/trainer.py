@@ -166,15 +166,16 @@ class BaseTrainer(object):
                     outputs = self.net(data,left_data,right_data)
                 else:
                     outputs = self.net(data,None,None)
-                # 都过infoNCE，但unlabel不过ce，只有data过ce
+                # 都过infoNCE，但unlabel不过ce，只有labelled过ce
                 # print(outputs[0].size())
                 target[label_batch:]=torch.argmax(outputs[0][label_batch:,:],dim=1)
                 loss1=self.infoNCE(outputs[1],outputs[2],target)*0.1
-                logit_mask=torch.ones_like(outputs[0])
-                logit_mask[label_batch:,:]=0
-                target_mask=torch.ones_like(target)
-                target_mask[label_batch:]=0
-                loss2=nn.CrossEntropyLoss()(outputs[0]*logit_mask, target*target_mask)*0.9
+                # logit_mask=torch.ones_like(outputs[0])
+                # logit_mask[label_batch:,:]=0
+                # target_mask=torch.ones_like(target)
+                # target_mask[label_batch:]=0
+                target[label_batch:]=-1
+                loss2=nn.CrossEntropyLoss(ignore_index=-1)(outputs[0], target)*0.9
                 loss = loss1+loss2
                 self.optimizer.zero_grad()
                 loss.backward()
