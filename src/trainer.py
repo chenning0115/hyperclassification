@@ -170,7 +170,7 @@ class BaseTrainer(object):
                 # 都过infoNCE，但unlabel不过ce，只有labelled过ce
                 # print(outputs[0].size())
                 target[label_batch:]=torch.argmax(outputs[0][label_batch:,:],dim=1)
-                loss1=self.infoNCE(outputs[1],outputs[2],target)*weight
+                loss1=self.infoNCE(outputs[1],outputs[2],target,self.train_params['temp'])*weight
                 # logit_mask=torch.ones_like(outputs[0])
                 # logit_mask[label_batch:,:]=0
                 # target_mask=torch.ones_like(target)

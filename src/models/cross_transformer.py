@@ -216,12 +216,12 @@ class HSINet(nn.Module):
         patch_size = data_params.get("patch_size", 13)
         self.spectral_size = data_params.get("spectral_size", 200)
 
-        dim = net_params.get("dim", 64)
         depth = net_params.get("depth", 1)
         heads = net_params.get("heads", 8)
         mlp_dim = net_params.get("mlp_dim", 8)
         dropout = net_params.get("dropout", 0)
         conv2d_out = 64
+        dim = net_params.get("dim", 64)
         dim_heads = dim
         mlp_head_dim = dim
         
@@ -238,7 +238,12 @@ class HSINet(nn.Module):
             nn.Conv2d(in_channels=self.spectral_size, out_channels=conv2d_out, kernel_size=(3, 3), padding=(1,1)),
             nn.BatchNorm2d(conv2d_out),
             nn.ReLU(),
+            # featuremap 是在这之后加一层channel上的压缩
+            nn.Conv2d(in_channels=conv2d_out,out_channels=dim,kernel_size=1,stride=1),
+            nn.BatchNorm2d(dim),
+            nn.ReLU()
         )
+
         self.cls_token_pixel = nn.Parameter(torch.randn(1, 1, dim))
         self.to_latent_pixel = nn.Identity()
 
