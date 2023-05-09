@@ -112,72 +112,13 @@ class BaseTrainer(object):
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
         weight=self.train_params.get('weight',0.1)
-        '''
-        第一阶段使用原始data也过一遍backbone，然后去做CE。
-        '''
         for epoch in range(pre_epochs):
             self.net.train()
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                if self.aug:
-                    left_data, right_data = do_augment(self.aug,data)
-                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs=self.net(data,left_data,right_data)
-                else:
-                    outputs = self.net(data, None, None)
+                outputs = self.net(data, None, None)
                 loss = self.get_loss(outputs, target)
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip)
-                self.optimizer.step()
-                # batch stat
-                total_loss += loss.item()
-                epoch_avg_loss.update(loss.item(), data.shape[0])
-            recorder.append_index_value("epoch_loss", epoch + 1, epoch_avg_loss.get_avg())
-            print('[Epoch: %d]  [epoch_loss: %.5f]  [all_epoch_loss: %.5f] [current_batch_loss: %.5f] [batch_num: %s]' % (epoch + 1,
-                                                                             epoch_avg_loss.get_avg(), 
-                                                                             total_loss / (epoch + 1),
-                                                                             loss.item(), epoch_avg_loss.get_num()))
-            # 一定epoch下进行一次eval
-            if test_loader and (epoch+1) % 10 == 0:
-                y_pred_test, y_test = self.test(test_loader)
-                temp_res = self.evalator.eval(y_test, y_pred_test)
-                recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
-                recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
-                recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
-                print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
-        '''
-        下面使用伪label进行contra的训练，数据方面使用unlabel_data
-        这个用test+train数据进行拼合，unlabelled不参与ce。
-        '''
-        for epoch in range(contra_epochs):
-            self.net.train()
-            epoch_avg_loss.reset()
-            for i, (data, target) in enumerate(train_loader):
-                data,target = data.to(self.device), target.to(self.device)
-                label_batch=data.size(0)
-                if self.use_unlabel:
-                    unlabel_data,unlabel_target=self.get_next_unlabel()
-                    data=torch.cat([data,unlabel_data],dim=0)
-                    target=torch.cat([target,unlabel_target],dim=0)
-                if self.aug:
-                    left_data, right_data = do_augment(self.aug,data)
-                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs = self.net(data,left_data,right_data)
-                else:
-                    outputs = self.net(data,None,None)
-                # 都过infoNCE，但unlabel不过ce，只有labelled过ce
-                # print(outputs[0].size())
-                target[label_batch:]=torch.argmax(outputs[0][label_batch:,:],dim=1)
-                loss1=self.infoNCE(outputs[1],outputs[2],target,self.train_params['temp'])*weight
-                # logit_mask=torch.ones_like(outputs[0])
-                # logit_mask[label_batch:,:]=0
-                # target_mask=torch.ones_like(target)
-                # target_mask[label_batch:]=0
-                target[label_batch:]=-1
-                loss2=nn.CrossEntropyLoss(ignore_index=-1)(outputs[0], target)*(1-weight)
-                loss = loss1+loss2
                 self.optimizer.zero_grad()
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip)
@@ -343,15 +284,18 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         '''
         logits, A_vecs, B_vecs = outputs
         
-        weight_nce = 0.1
-        # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
-        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
-        loss_nce = loss_nce_2
-        loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
+        # weight_nce = 0.1
+        # # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
+        # loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        # loss_nce = loss_nce_2
+        # loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
 
         # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
 
-        return loss_nce + loss_main   
+        # return loss_nce + loss_main   
+        loss_main = nn.CrossEntropyLoss()(logits, target)
+        return loss_main
+
 
 class Conv1dTrainer(BaseTrainer):
     def __init__(self, params) -> None:
