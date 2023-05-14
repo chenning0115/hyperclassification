@@ -345,7 +345,7 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         
         weight_nce = 0.1
         # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
-        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target) * weight_nce
+        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target,self.train_params['temp']) * weight_nce
         loss_nce = loss_nce_2
         loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
 
