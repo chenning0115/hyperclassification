@@ -8,12 +8,13 @@ from models import cross_transformer
 from models import conv1d
 from models import conv2d
 from models import conv3d
+from models import SSFTTnet
+from models import CASST
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
 from augment import do_augment
 import itertools
-
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -105,7 +106,7 @@ class BaseTrainer(object):
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
                 data, target = data.to(self.device), target.to(self.device)
-                outputs = self.net(data, None, None)
+                outputs = self.net(data)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -498,6 +499,40 @@ class Conv3dTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
+
+
+class SSFTTTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+
+    def real_init(self):
+        # net
+        self.net = SSFTTnet.SSFTTnet(self.params).to(self.device)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
+        # optimizer
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+
+class CASSTTrainer(BaseTrainer):
+    def __init__(self, params):
+        super(CASSTTrainer, self).__init__(params)
+
+    def get_loss(self, outputs, target):
+        logits, A, B = outputs
+        return self.criterion(logits, target)
+
+    def real_init(self):
+        # net
+        self.net = CASST.CASST(self.params).to(self.device)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
+        # optimizer
+        self.optimizer = torch.optim.SGD(self.net.parameters(), 0.005, momentum=0.9, weight_decay=1e-4, nesterov=True)
+
 def get_trainer(params):
     trainer_type = params['net']['trainer']
     if trainer_type == "cross_trainer":
@@ -516,6 +551,10 @@ def get_trainer(params):
         return KNNTrainer(params)
     if trainer_type == "contra_cross_transformer":
         return ContraCrossTransformerTrainer(params)
+    if trainer_type == "ssftt":
+        return SSFTTTrainer(params)
+    if trainer_type == "casst":
+        return CASSTTrainer(params)
 
     assert Exception("Trainer not implemented!")
 

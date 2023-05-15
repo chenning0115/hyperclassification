@@ -56,7 +56,9 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'indian_cross_param.json',
+    "indian_ssftt.json",
+    # 'indian_casst.json'
+    # 'indian_cross_param.json',
     # 'pavia_cross_param.json',
 ]
 

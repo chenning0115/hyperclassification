@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.io as sio
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, accuracy_score, classification_report, cohen_kappa_score
 import torch
@@ -59,6 +60,7 @@ class HSIDataLoader(object):
         self.spectracl_size = self.data_param.get("spectral_size", 0)
         self.append_dim = self.data_param.get("append_dim", False)
         self.use_norm = self.data_param.get("use_norm", True)
+        self.norm_type = self.data_param.get("norm_type", 'max_min') # 'none', 'max_min', 'mean_var'
 
 
         self.diffusion_sign = self.data_param.get('diffusion_sign', False)
@@ -158,6 +160,14 @@ class HSIDataLoader(object):
         newX = np.reshape(newX, (X.shape[0], X.shape[1], numComponents))
         return newX
 
+    def mean_var_norm(self, data):
+        print("use mean_var norm...")
+        h, w, c = data.shape
+        data = data.reshape(h * w, c)
+        data = StandardScaler().fit_transform(data)
+        data = data.reshape(h, w, c)
+        return data
+
     def data_preprocessing(self, data):
         '''
         1. normalization
@@ -165,12 +175,14 @@ class HSIDataLoader(object):
         3. spectral filter
         data: [h, w, spectral]
         '''
-        if self.use_norm:
+        if self.norm_type == 'max_min':
             norm_data = np.zeros(data.shape)
             for i in range(data.shape[2]):
                 input_max = np.max(data[:,:,i])
                 input_min = np.min(data[:,:,i])
                 norm_data[:,:,i] = (data[:,:,i]-input_min)/(input_max-input_min)
+        elif self.norm_type == 'mean_var':
+            norm_data = self.mean_var_norm(data)
         else:
             norm_data = data 
         pca_num = self.data_param.get('pca', 0)
