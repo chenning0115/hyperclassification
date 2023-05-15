@@ -56,7 +56,8 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'pavia_contra_mask.json',
+    'indian_cross_param.json',
+    # 'pavia_cross_param.json',
 ]
 
 def check_convention(name):

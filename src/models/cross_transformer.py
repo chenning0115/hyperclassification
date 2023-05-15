@@ -263,6 +263,12 @@ class HSINet(nn.Module):
             nn.ReLU(),
             nn.Linear(mlp_dim2, num_classes),
         )
+        # self.classifier_mlp = nn.Sequential(
+        #     nn.Linear(mlp_dim1, mlp_dim2),
+        #     nn.BatchNorm1d(mlp_dim2),
+        #     nn.ReLU(),
+        #     nn.Linear(mlp_dim2, mlp_dim2),
+        # )
 
     def classifier(self, x):
         '''

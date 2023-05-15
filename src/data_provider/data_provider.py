@@ -50,6 +50,7 @@ class HSIDataLoader(object):
         # 参数设置
         self.if_numpy = self.data_param.get('if_numpy', False)
         self.data_sign = self.data_param.get('data_sign', 'Indian')
+        self.data_file = self.data_param.get('data_file', self.data_sign)
         self.patch_size = self.data_param.get('patch_size', 13) # n * n
         self.remove_zeros = self.data_param.get('remove_zeros', True)
         self.test_ratio = self.data_param.get('test_ratio', 0.9)
@@ -76,7 +77,7 @@ class HSIDataLoader(object):
     def load_raw_data(self):
         data, labels = None, None
         assert self.data_sign in ['Indian', 'Pavia', 'Houston']
-        data_path = '%s/%s/%s_split.mat' % (self.data_path_prefix, self.data_sign, self.data_sign)
+        data_path = '%s/%s/%s_split.mat' % (self.data_path_prefix, self.data_sign, self.data_file)
         all_data = sio.loadmat(data_path)
         data = all_data['input']
         TR = all_data['TR'] # train label

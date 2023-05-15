@@ -42,8 +42,9 @@ class HSIEvaluation(object):
 
 
     def eval(self, y_test, y_pred_test):
+        class_num = np.max(y_test)
         classification = classification_report(y_test, y_pred_test, 
-                digits=4, target_names=self.target_names)
+                labels=list(range(class_num)), digits=4, target_names=self.target_names)
         oa = accuracy_score(y_test, y_pred_test)
         confusion = confusion_matrix(y_test, y_pred_test)
         each_acc, aa = self.AA_andEachClassAccuracy(confusion)
