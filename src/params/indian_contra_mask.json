@@ -2,21 +2,21 @@
     "data":{
         "data_sign":"Indian",
         "diffusion_sign":false,
-        "patch_size":7,
+        "patch_size":13,
         "test_ratio":0.90,
         "batch_size":64,
         "num_classes":16,
-        "pca":64,
-        "dim_heads": 48,
-        "spectral_size": 64
+        "pca":100,
+        "dim_heads": 64,
+        "spectral_size": 100
     },
     "net": {
         "trainer": "contra_cross_transformer",
         "net_type": "just_pixel",
-        "mlp_head_dim": 48,
-        "depth": 1,
+        "mlp_head_dim": 64,
+        "depth": 2,
         "dim": 32,
-        "heads": 8,
+        "heads": 20,
         "conv3d_kernal_size":[3,3,3],
         "conv3d_padding":[2,1,1]
     },

@@ -5,14 +5,17 @@ json_file='./params/pavia_contra_mask.json'
 
 # labels=[0.5,1.0]
 # temps=[15,20,25,30,35,40,45,50]
+pcas=[30,35,40,45,50]
+patch_sizes=[13,15,17]
 
-# for l in labels:
-#     for t in temps:
-#         with open(json_file,'r') as fin:
-#             config_in=json.load(fin)
-#         config_in['data']['unlabelled_multiple']=l
-#         config_in['train']['temp']=t
-#         with open(json_file,'w') as fout:
-#             json.dump(config_in,fout,indent=4)
-for i in range(10):
-    os.system("python ./workflow.py")
+for pca in pcas:
+    for t in patch_sizes:
+        with open(json_file,'r') as fin:
+            config_in=json.load(fin)
+        config_in['data']['pca']=pca
+        config_in['data']['spectral_size']=pca
+        config_in['data']['patch_size']=t
+        with open(json_file,'w') as fout:
+            json.dump(config_in,fout,indent=4)
+        for i in range(10):
+            os.system("python ./workflow.py")
