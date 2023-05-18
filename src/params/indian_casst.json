@@ -1,16 +1,16 @@
 {
     "data": {
         "data_sign": "Indian",
-        "data_file": "Indian_20",
-        "diffusion_sign": true,
+        "data_file": "Indian_10",
+        "diffusion_sign": false,
         "diffusion_data_sign_path_prefix": "../data/Indian/unet3d_patch16_without_downsample_kernal5_fix/save_feature",
         "diffusion_data_sign": "t5_2_full.pkl.npy",
         "patch_size": 11,
         "batch_size": 64,
         "num_classes": 16,
-        "pca": 200,
+        "pca": 30,
         "dim_heads": 64,
-        "spectral_size": 200
+        "spectral_size": 30
     },
     "net": {
         "trainer": "casst"

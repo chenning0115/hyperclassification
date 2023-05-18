@@ -4,7 +4,8 @@ from sklearn.decomposition import PCA
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from models import cross_transformer 
+from models import cross_transformer as cross_transformer
+from models import transformer_pavia
 from models import conv1d
 from models import conv2d
 from models import conv3d
@@ -377,8 +378,58 @@ class CrossTransformerTrainer(BaseTrainer):
 
         return loss_main   
 
+class CrossTransformerTrainerIndian(BaseTrainer):
+    def __init__(self, params):
+        super(CrossTransformerTrainerIndian, self).__init__(params)
 
 
+    def real_init(self):
+        # net
+        self.net = transformer_pavia.HSINet(self.params).to(self.device)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
+        # optimizer
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def get_loss(self, outputs, target):
+        '''
+            A_vecs: [batch, dim]
+            B_vecs: [batch, dim]
+            logits: [batch, class_num]
+        '''
+        logits, A_vecs, B_vecs = outputs
+        
+        loss_main = nn.CrossEntropyLoss()(logits, target) 
+
+        return loss_main   
+class CrossTransformerTrainerPavia(BaseTrainer):
+    def __init__(self, params):
+        super(CrossTransformerTrainerPavia, self).__init__(params)
+
+
+    def real_init(self):
+        # net
+        self.net = transformer_pavia.HSINet(self.params).to(self.device)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
+        # optimizer
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+    def get_loss(self, outputs, target):
+        '''
+            A_vecs: [batch, dim]
+            B_vecs: [batch, dim]
+            logits: [batch, class_num]
+        '''
+        logits, A_vecs, B_vecs = outputs
+        
+        loss_main = nn.CrossEntropyLoss()(logits, target) 
+
+        return loss_main   
 class ContraCrossTransformerTrainer(BaseContraTrainer):
     def __init__(self, params):
         super(ContraCrossTransformerTrainer,self).__init__(params)
@@ -537,6 +588,10 @@ def get_trainer(params):
     trainer_type = params['net']['trainer']
     if trainer_type == "cross_trainer":
         return CrossTransformerTrainer(params)
+    if trainer_type == "cross_trainer_pavia":
+        return CrossTransformerTrainerPavia(params)
+    if trainer_type == "cross_trainer_indian":
+        return CrossTransformerTrainerIndian(params)
     if trainer_type == "conv1d":
         return Conv1dTrainer(params)
     if trainer_type == "conv2d":
