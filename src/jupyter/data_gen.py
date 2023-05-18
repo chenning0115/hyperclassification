@@ -1,3 +1,4 @@
+import os, sys
 from scipy.io import loadmat
 import numpy as np
 import pandas as pd
@@ -22,8 +23,8 @@ def load_data(data_sign, data_path_prefix):
         labels = sio.loadmat('%s/Salinas_gt.mat' % data_path_prefix)['salinas_gt']
     return data, labels
 
-def gen(data_sign, train_num_per_class, max_percent=0.5):
-    data, labels = load_data(data_sign)
+def gen(data_sign, train_num_per_class, data_path_prefix, max_percent=0.5):
+    data, labels = load_data(data_sign, data_path_prefix)
     h, w, c = data.shape
     class_num = labels.max()
     class2data = {}
@@ -61,9 +62,12 @@ def run():
     data_path_prefix = '../../data'
     train_num_per_class_list = [10, 20, 30, 40, 50, 60, 70, 80]
     for data_sign in signs:
+        pp = '../../data/%s' % data_sign
+        if not os.path.exists(pp):
+            os.makedirs(pp)
         for train_num_per_class in train_num_per_class_list:
-            save_path = '../../data/%s/%s_80_split.mat' %(data_sign, data_sign)
-            target = gen(data_sign, train_num_per_class)
+            save_path = '%s/%s_%s_split.mat' %(pp, data_sign, train_num_per_class)
+            target = gen(data_sign, train_num_per_class, data_path_prefix)
             sio.savemat(save_path, target)
             print('save %s done.' % save_path)
 
