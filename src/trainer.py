@@ -106,6 +106,8 @@ class BaseTrainer(object):
         return data.to(self.device),unlabeled.to(self.device)
         
     def train(self, train_loader, unlabel_loader=None,test_loader=None):
+        max_oa=0.
+        max_eval={}
         self.unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
         pre_epochs = self.params['train'].get('pretrain_epochs', 100)
         contra_epochs=self.train_params.get('contra_epochs')
@@ -194,11 +196,16 @@ class BaseTrainer(object):
             if test_loader and (epoch+1) % 10 == 0:
                 y_pred_test, y_test = self.test(test_loader)
                 temp_res = self.evalator.eval(y_test, y_pred_test)
+                print('max oa: %.3f'%max_oa)
+                if temp_res['oa']>max_oa:
+                    max_eval=temp_res.copy()
+                    max_oa=temp_res['oa']
                 recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
                 recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
                 recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
                 print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
         print('Finished Training')
+        recorder.record_eval(max_eval)
         return True
 
     def final_eval(self, test_loader):

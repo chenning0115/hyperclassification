@@ -20,13 +20,13 @@ def train_by_param(param):
     # 2. 训练和测试
     trainer = get_trainer(param)
     trainer.train(train_loader, unlabel_loader,test_loader)
-    eval_res = trainer.final_eval(test_loader)
+    # eval_res = trainer.final_eval(test_loader)
     # pred_all, y_all = trainer.test(all_loader)
     # pred_matrix = dataloader.reconstruct_pred(pred_all)
 
     #3. record all information
     recorder.record_param(param)
-    recorder.record_eval(eval_res)
+    # recorder.record_eval(eval_res)
     # recorder.record_pred(pred_matrix)
 
     return recorder
@@ -56,7 +56,8 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'pavia_contra_mask.json',
+    # 'houston_contra_mask.json',
+    'indian_contra_mask.json'
 ]
 
 def check_convention(name):
