@@ -12,11 +12,11 @@
         "spectral_size": 30
     },
     "net": {
-        "trainer": "contra_cross_transformer",
+        "trainer": "guided_contra_cross_transformer",
         "net_type": "just_pixel",
         "mlp_head_dim": 64,
         "depth": 1,
-        "dim": 32,
+        "dim": 64,
         "heads": 8,
         "conv3d_kernal_size": [
             3,
