@@ -13,7 +13,7 @@ from utils import recorder
 from evaluation import HSIEvaluation
 from augment import do_augment
 import itertools
-from func import get_fun
+from func import get_fun, get_fun_label
 
 from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
@@ -87,6 +87,7 @@ class ContraBaseTrainer(object):
         self.use_unlabel=params['train'].get('use_unlabel',False)
         self.guided_type = self.train_params.get('guided_type', 'logits_argmax')
         self.weight_func = get_fun(self.train_params.get('weight_func', 'multi_linear'))
+        self.unlabel_func = get_fun_label(self.train_params.get('unlabel_func', 'label_multi_linear'))
 
         self.net = None
         self.criterion = None
@@ -106,8 +107,11 @@ class ContraBaseTrainer(object):
     def get_next_unlabel(self, cur_epoch=-1):
         i,(data,target)=next(self.unlabel_loader)
         unlabeled=torch.ones_like(target)*-1
-        return data.to(self.device),unlabeled.to(self.device)
-        
+        unlabel_num = self.unlabel_func(cur_epoch) * data.size(0)
+        data, unlabeled = data[:unlabel_num], unlabeled[:unlabel_num]
+        return data.to(self.device), unlabeled.to(self.device)
+
+       
     def train(self, train_loader, unlabel_loader=None,test_loader=None):
         max_oa=0.
         max_eval={}
@@ -124,7 +128,7 @@ class ContraBaseTrainer(object):
                 data,target = data.to(self.device), target.to(self.device)
                 label_batch=data.size(0)
                 if self.use_unlabel:
-                    unlabel_data,unlabel_target=self.get_next_unlabel()
+                    unlabel_data,unlabel_target=self.get_next_unlabel(self.cur_epoch)
                     data=torch.cat([data,unlabel_data],dim=0)
                     target=torch.cat([target,unlabel_target],dim=0)
                 if self.aug:
@@ -243,8 +247,6 @@ class ContraBaseTrainer(object):
                 y_pred_test = np.concatenate((y_pred_test, outputs))
                 y_test = np.concatenate((y_test, labels))
         return y_pred_test, y_test
-
-
 
 class BaseTrainer(object):
     def __init__(self, params) -> None:
@@ -486,28 +488,6 @@ class GuidedContraCrossTransformerTrainer(ContraBaseTrainer):
         loss_nce = torch.mean(torch.diag(matrix_log))
         return loss_nce
 
-    def infoNCE(self, A_vecs, B_vecs, targets, temperature=15):
-        '''
-        targets: [batch]  dtype is int
-        '''
-        A_vecs = torch.divide(A_vecs, torch.norm(A_vecs, p=2, dim=1, keepdim=True))
-        B_vecs = torch.divide(B_vecs, torch.norm(B_vecs, p=2, dim=1, keepdim=True))
-        matrix_logits = torch.matmul(A_vecs, torch.transpose(B_vecs, 0, 1)) * temperature # [batch, batch] each row represents one A item match all B
-        # tempa = matrix_logits.detach().cpu().numpy()
-        # print("logits,", tempa.max(), tempa.min())
-        matrix_softmax = torch.softmax(matrix_logits, dim=1) # softmax by dim=1
-        tempb = matrix_softmax.detach().cpu().numpy()
-        # print("softmax,", tempb)
-        # print("label,", targets)
-        matrix_log = -1 * torch.log(matrix_softmax)
-
-        l = targets.shape[0]
-        tb = torch.repeat_interleave(targets.reshape([-1,1]), l, dim=1)
-        tc = torch.repeat_interleave(targets.reshape([1,-1]), l, dim=0)
-        mask_matrix = tb.eq(tc).int()
-        # here just use dig part
-        loss_nce = torch.sum(matrix_log * mask_matrix) / torch.sum(mask_matrix)
-        return loss_nce
 
 class ContraCrossTransformerTrainer(BaseTrainer):
     def __init__(self, params):
@@ -521,6 +501,23 @@ class ContraCrossTransformerTrainer(BaseTrainer):
         self.weight_decay = self.train_params.get('weight_decay', 5e-3)
         self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
 
+    def get_loss(self, outputs, target):
+        '''
+            A_vecs: [batch, dim]
+            B_vecs: [batch, dim]
+            logits: [batch, class_num]
+        '''
+        logits, A_vecs, B_vecs = outputs
+        
+        weight_nce = 0.1
+        # loss_nce_1 = self.infoNCE_diag(A_vecs, B_vecs) * weight_nce
+        loss_nce_2 = self.infoNCE(A_vecs, B_vecs, target,self.train_params['temp']) * weight_nce
+        loss_nce = loss_nce_2
+        loss_main = nn.CrossEntropyLoss()(logits, target) * (1 - weight_nce)
+
+        # print('nce=%s, main=%s, loss=%s' % (loss_nce.detach().cpu().numpy(), loss_main.detach().cpu().numpy(), (loss_nce + loss_main).detach().cpu().numpy()))
+
+        return loss_nce + loss_main  
     
     def infoNCE_diag(self, A_vecs, B_vecs, temperature=10):
         '''

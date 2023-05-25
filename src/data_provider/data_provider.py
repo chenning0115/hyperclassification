@@ -76,7 +76,7 @@ class HSIDataLoader(object):
     def load_raw_data(self):
         data, labels = None, None
         assert self.data_sign in ['Indian', 'Pavia', 'Houston','Salinas']
-        data_path = '%s/%s/%s_10_split.mat' % (self.data_path_prefix, self.data_sign, self.data_sign)
+        data_path = '%s/%s/%s_20_split.mat' % (self.data_path_prefix, self.data_sign, self.data_sign)
         all_data = sio.loadmat(data_path)
         data = all_data['input']
         TR = all_data['TR'] # train label
