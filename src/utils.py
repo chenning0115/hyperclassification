@@ -1,6 +1,9 @@
 import os, sys
 import json, time
 import numpy as np
+import torch
+
+device = torch.device("cuda:5" if torch.cuda.is_available() else "cpu")
 
 
 class AvgrageMeter(object):

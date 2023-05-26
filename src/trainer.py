@@ -20,6 +20,8 @@ from sklearn import svm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.neighbors import KNeighborsClassifier
 
+from utils import device
+
 
 class SKlearnTrainer(object):
     def __init__(self, params) -> None:
@@ -82,7 +84,7 @@ class BaseTrainer(object):
         self.params = params
         self.net_params = params['net']
         self.train_params = params['train']
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device 
         self.evalator = HSIEvaluation(param=params)
 
         self.net = None

@@ -61,10 +61,10 @@ include_path = [
     # 'indian_cross_param.json',
     # 'indian_cross_param_use.json',
 
-    'pavia_cross_param_use.json',
+    # 'pavia_cross_param_use.json',
     # 'pavia_cross_param.json',
 
-    # 'salinas_cross_param_use.json'
+    'salinas_cross_param_use.json'
 ]
 
 def check_convention(name):
