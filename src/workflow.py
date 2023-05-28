@@ -56,9 +56,10 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    # 'houston_contra_mask.json',
-    # 'indian_contra_mask.json',
-    'pavia_contra_mask.json'
+    'houston_contra_mask.json',
+    'indian_contra_mask.json',
+    # 'pavia_contra_mask.json',
+    'salinas_contra_mask.json'
 ]
 
 def check_convention(name):
@@ -68,7 +69,7 @@ def check_convention(name):
     return False
 
 def run_all():
-    save_path_prefix = './res/'
+    save_path_prefix = './res/one_step'
     if not os.path.exists(save_path_prefix):
         os.makedirs(save_path_prefix)
     for name in include_path:
@@ -81,8 +82,8 @@ def run_all():
             train_convention_by_param(param)
         else:
             train_by_param(param)
-        print('model eval done of %s...' % name)
-        path = '%s/%s' % (save_path_prefix, name) 
+        print('model eval done of %s...' % param['data']['data_sign'])
+        path = '%s/%s/%d/%d/' % (save_path_prefix, param['data']['data_sign'],param['data']['perclass'],param['data']['sample'])
         recorder.to_file(path)
 
 

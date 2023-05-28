@@ -9,10 +9,12 @@
         "num_classes": 16,
         "pca": 30,
         "dim_heads": 64,
-        "spectral_size": 30
+        "spectral_size": 30,
+        "perclass": 70,
+        "sample": 1
     },
     "net": {
-        "trainer": "contra_cross_transformer",
+        "trainer": "guided_contra_cross_transformer",
         "net_type": "just_pixel",
         "mlp_head_dim": 64,
         "depth": 3,
