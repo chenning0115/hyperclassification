@@ -7,6 +7,7 @@ from utils import recorder
 from data_provider.data_provider import HSIDataLoader 
 from trainer import get_trainer, BaseTrainer, CrossTransformerTrainer
 import evaluation
+from utils import check_convention, config_path_prefix
 
 DEFAULT_RES_SAVE_PATH_PREFIX = "./res/"
 
@@ -59,20 +60,18 @@ include_path = [
     # "indian_ssftt.json",
     # 'indian_casst.json'
     # 'indian_cross_param.json',
-    'indian_cross_param_use.json',
+    # 'indian_cross_param_use.json',
 
     # 'pavia_cross_param_use.json',
     # 'pavia_cross_param.json',
 
-    #'salinas_cross_param_use.json'
+    # 'salinas_cross_param_use.json'
     # 'pavia_cross_param_use.json',
-]
 
-def check_convention(name):
-    for a in ['knn', 'random_forest', 'svm']:
-        if a in name:
-            return True
-    return False
+
+    # for batch process 
+    'temp.json'
+]
 
 def run_all():
     save_path_prefix = './res/'
@@ -80,16 +79,17 @@ def run_all():
         os.makedirs(save_path_prefix)
     for name in include_path:
         convention = check_convention(name)
-        path_param = './params/%s' % name
+        path_param = '%s/%s' % (config_path_prefix, name)
         with open(path_param, 'r') as fin:
             param = json.loads(fin.read())
-        print('start to train %s...' % name)
+        uniq_name = param.get('uniq_name', name)
+        print('start to train %s...' % uniq_name)
         if convention:
             train_convention_by_param(param)
         else:
             train_by_param(param)
-        print('model eval done of %s...' % name)
-        path = '%s/%s' % (save_path_prefix, name) 
+        print('model eval done of %s...' % uniq_name)
+        path = '%s/%s' % (save_path_prefix, uniq_name) 
         recorder.to_file(path)
 
 

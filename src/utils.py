@@ -3,7 +3,14 @@ import json, time
 import numpy as np
 import torch
 
-device = torch.device("cuda:7" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+config_path_prefix = './params_use'
+
+def check_convention(name):
+    for a in ['knn', 'random_forest', 'svm']:
+        if a in name:
+            return True
+    return False
 
 
 class AvgrageMeter(object):
