@@ -23,7 +23,7 @@
         "heads": 20
     },
     "train": {
-        "epochs": 150,
+        "epochs": 100,
         "lr": 0.001,
         "weight_decay": 0,
         "temp": 20

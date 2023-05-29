@@ -4,16 +4,16 @@
         "data_file": "Pavia_40",
         "dump": false,
         "use_dump": false,
-        "diffusion_sign": false,
+        "diffusion_sign": true,
         "diffusion_data_sign_path_prefix": "/home/cn/codes/spectral_diff_temp/codes/save_feature/pavia_unet3d_patch16_without_downsample_kernal5_fix/save_feature",
         "diffusion_data_sign": "t10_2_full.pkl.npy",
         "patch_size": 13,
         "test_ratio": 0.95,
         "batch_size": 64,
         "num_classes": 16,
-        "pca": 103,
+        "pca": 900,
         "dim_heads": 64,
-        "spectral_size": 103
+        "spectral_size": 900
     },
     "net": {
         "trainer": "cross_trainer",
