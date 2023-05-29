@@ -56,10 +56,13 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    'houston_contra_mask.json',
-    'indian_contra_mask.json',
-    # 'pavia_contra_mask.json',
+    # 'houston_contra_mask.json',
+    # 'indian_contra_mask.json',
+    'pavia_contra_mask.json',
     'salinas_contra_mask.json'
+    # 'pavia_SSRN.json'
+    # 'indian_SSRN.json'
+
 ]
 
 def check_convention(name):

@@ -10,8 +10,8 @@
         "pca": 30,
         "dim_heads": 64,
         "spectral_size": 30,
-        "perclass": 70,
-        "sample": 1
+        "perclass": 60,
+        "sample": 2
     },
     "net": {
         "trainer": "guided_contra_cross_transformer",

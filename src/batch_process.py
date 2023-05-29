@@ -1,10 +1,11 @@
 import os
 import json
 
-json_files=['./params/indian_contra_mask.json'
-            ,'./params/salinas_contra_mask.json'
-            ,'./params/houston_contra_mask.json'
-            # ,'./params/pavia_contra_mask.json'
+json_files=[
+    # './params/indian_contra_mask.json'
+            './params/salinas_contra_mask.json'
+            # ,'./params/houston_contra_mask.json'
+            ,'./params/pavia_contra_mask.json'
             ]
 
 # labels=[0.5,1.0]
@@ -14,8 +15,8 @@ json_files=['./params/indian_contra_mask.json'
 # depths=[1,2,3]
 # heads=[8,16,24]
 
-for perclass in range(10,90,10):
-    for s in range(1,4):
+for perclass in range(30,90,10):
+    for s in range(1,3):
         for f in json_files:
             with open(f,'r') as fin:
                 config_in=json.load(fin)

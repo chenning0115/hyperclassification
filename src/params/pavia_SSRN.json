@@ -7,40 +7,25 @@
         "batch_size": 64,
         "unlabelled_multiple": 1,
         "num_classes": 9,
-        "pca": 30,
+        "pca": -103,
         "dim_heads": 64,
-        "spectral_size": 30,
-        "perclass": 60,
-        "sample": 2
+        "spectral_size": 103,
+        "perclass": 30,
+        "sample": 1
     },
     "net": {
-        "trainer": "guided_contra_cross_transformer",
+        "trainer": "SSRN",
         "net_type": "just_pixel",
-        "mlp_head_dim": 64,
-        "depth": 1,
-        "dim": 64,
-        "heads": 8,
-        "conv3d_kernal_size": [
-            3,
-            3,
-            3
-        ],
-        "conv3d_padding": [
-            2,
-            1,
-            1
-        ]
+        "k":49,
+        "num_classes": 9
     },
     "train": {
         "pretrain_epochs": 100,
         "contra_epochs": 200,
-        "lr": 0.001,
+        "lr": 0.0003,
         "weight_decay": 0,
         "use_unlabel": true,
         "weight": 0.1,
         "temp": 10
-    },
-    "aug": {
-        "type": "Mask"
     }
 }

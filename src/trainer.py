@@ -8,6 +8,7 @@ from models import cross_transformer
 from models import conv1d
 from models import conv2d
 from models import conv3d
+from models import SSRN
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
@@ -116,7 +117,7 @@ class ContraBaseTrainer(object):
         max_oa=0.
         max_eval={}
         self.unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
-        epochs = self.params['train'].get('epochs', 300)
+        epochs = self.params['train'].get('epochs', 200)
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
 
@@ -279,16 +280,13 @@ class BaseTrainer(object):
     def train(self, train_loader, unlabel_loader=None,test_loader=None):
         max_oa=0.
         max_eval={}
-        self.unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
-        pre_epochs = self.params['train'].get('pretrain_epochs', 100)
-        contra_epochs=self.train_params.get('contra_epochs')
+        # self.unlabel_loader = enumerate(itertools.cycle(unlabel_loader))
+        # pre_epochs = self.params['train'].get('pretrain_epochs', 100)
+        # contra_epochs=self.train_params.get('contra_epochs')
         total_loss = 0
         epoch_avg_loss = utils.AvgrageMeter()
         weight=self.train_params.get('weight',0.1)
-        '''
-        第一阶段使用原始data也过一遍backbone，然后去做CE。
-        '''
-        for epoch in range(pre_epochs):
+        for epoch in range(200):
             self.net.train()
             epoch_avg_loss.reset()
             for i, (data, target) in enumerate(train_loader):
@@ -298,7 +296,7 @@ class BaseTrainer(object):
                     left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
                     outputs=self.net(data,left_data,right_data)
                 else:
-                    outputs = self.net(data, None, None)
+                    outputs = self.net(data.float(), None, None)
                 loss = self.get_loss(outputs, target)
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -316,61 +314,6 @@ class BaseTrainer(object):
             if test_loader and (epoch+1) % 10 == 0:
                 y_pred_test, y_test = self.test(test_loader)
                 temp_res = self.evalator.eval(y_test, y_pred_test)
-                recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
-                recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
-                recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
-                print('[--TEST--] [Epoch: %d] [oa: %.5f] [aa: %.5f] [kappa: %.5f] [num: %s]' % (epoch+1, temp_res['oa'], temp_res['aa'], temp_res['kappa'], str(y_test.shape)))
-        '''
-        下面使用伪label进行contra的训练，数据方面使用unlabel_data
-        这个用test+train数据进行拼合，unlabelled不参与ce。
-        '''
-        for epoch in range(contra_epochs):
-            self.net.train()
-            epoch_avg_loss.reset()
-            for i, (data, target) in enumerate(train_loader):
-                data,target = data.to(self.device), target.to(self.device)
-                label_batch=data.size(0)
-                if self.use_unlabel:
-                    unlabel_data,unlabel_target=self.get_next_unlabel()
-                    data=torch.cat([data,unlabel_data],dim=0)
-                    target=torch.cat([target,unlabel_target],dim=0)
-                if self.aug:
-                    left_data, right_data = do_augment(self.aug,data)
-                    left_data, right_data = [d.to(self.device) for d in [left_data, right_data]]
-                    outputs = self.net(data,left_data,right_data)
-                else:
-                    outputs = self.net(data,None,None)
-                # 都过infoNCE，但unlabel不过ce，只有labelled过ce
-                # print(outputs[0].size())
-                target[label_batch:]=torch.argmax(outputs[0][label_batch:,:],dim=1)
-                loss1=self.infoNCE(outputs[1],outputs[2],target,self.train_params['temp'])*weight
-                # logit_mask=torch.ones_like(outputs[0])
-                # logit_mask[label_batch:,:]=0
-                # target_mask=torch.ones_like(target)
-                # target_mask[label_batch:]=0
-                target[label_batch:]=-1
-                loss2=nn.CrossEntropyLoss(ignore_index=-1)(outputs[0], target)*(1-weight)
-                loss = loss1+loss2
-                self.optimizer.zero_grad()
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.net.parameters(), self.clip)
-                self.optimizer.step()
-                # batch stat
-                total_loss += loss.item()
-                epoch_avg_loss.update(loss.item(), data.shape[0])
-            recorder.append_index_value("epoch_loss", epoch + 1, epoch_avg_loss.get_avg())
-            print('[Epoch: %d]  [epoch_loss: %.5f]  [all_epoch_loss: %.5f] [current_batch_loss: %.5f] [batch_num: %s]' % (epoch + 1,
-                                                                             epoch_avg_loss.get_avg(), 
-                                                                             total_loss / (epoch + 1),
-                                                                             loss.item(), epoch_avg_loss.get_num()))
-            # 一定epoch下进行一次eval
-            if test_loader and (epoch+1) % 10 == 0:
-                y_pred_test, y_test = self.test(test_loader)
-                temp_res = self.evalator.eval(y_test, y_pred_test)
-                print('max oa: %.3f'%max_oa)
-                if temp_res['oa']>max_oa:
-                    max_eval=temp_res.copy()
-                    max_oa=temp_res['oa']
                 recorder.append_index_value("train_oa", epoch+1, temp_res['oa'])
                 recorder.append_index_value("train_aa", epoch+1, temp_res['aa'])
                 recorder.append_index_value("train_kappa", epoch+1, temp_res['kappa'])
@@ -429,7 +372,7 @@ class BaseTrainer(object):
                 # outputs = self.get_logits(self.net(left_data, right_data))
             # else:
                 # outputs = self.get_logits(self.net(inputs))
-            outputs = self.get_logits(self.net(inputs))
+            outputs = self.get_logits(self.net(inputs,None,None))
             outputs = np.argmax(outputs.detach().cpu().numpy(), axis=1)
             if count == 0:
                 y_pred_test = outputs
@@ -439,6 +382,21 @@ class BaseTrainer(object):
                 y_pred_test = np.concatenate((y_pred_test, outputs))
                 y_test = np.concatenate((y_test, labels))
         return y_pred_test, y_test
+
+
+class SSRNTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+    def real_init(self):
+        # net
+        self.net = SSRN.SSRN(self.params).to(self.device) #这边传入SSRN需要的参数
+        # optimizer
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
 
 
 class CrossTransformerTrainer(BaseTrainer):
@@ -629,6 +587,8 @@ def get_trainer(params):
         return KNNTrainer(params)
     if trainer_type == "contra_cross_transformer":
         return ContraCrossTransformerTrainer(params)
+    if trainer_type =='SSRN':
+        return SSRNTrainer(params)
     if trainer_type == "guided_contra_cross_transformer":
         return GuidedContraCrossTransformerTrainer(params)
 
