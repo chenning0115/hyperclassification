@@ -58,7 +58,8 @@ def gen(data_sign, train_num_per_class, data_path_prefix, max_percent=0.5):
 
 def run():
     #signs = ['Indian', 'Pavia', 'Houston', 'Salinas']
-    signs = ['Salinas']
+    #signs = ['Salinas']
+    signs = ['Indian']
     data_path_prefix = '../../data'
     train_num_per_class_list = [10, 20, 30, 40, 50, 60, 70, 80]
     for data_sign in signs:
