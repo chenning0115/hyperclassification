@@ -2,19 +2,37 @@ import os
 import json
 from utils import check_convention, config_path_prefix
 from workflow import train_by_param, train_convention_by_param
+import subprocess
+import workflow
 
 exchange_json_file='%s/temp.json' % config_path_prefix
 
 def simple_run_times():
-    times = 5 #每个配置跑5次
-    sample_num = [10, 20, 30, 40, 50, 60, 70, 80]
-    # times = 1 #每个配置跑5次
-    # sample_num = [40]
+    times = 3 #每个配置跑5次
+    sample_num = [50, 60, 70, 80]
+    #times = 1 #每个配置跑5次
+    #sample_num = [40]
 
     configs = [
-        'indian_cross_param_use.json',
-        'pavia_cross_param_use.json',
-        'salinas_cross_param_use.json',
+        #'indian_cross_param_use.json',
+        #'pavia_cross_param_use.json',
+        #'salinas_cross_param_use.json',
+
+        #'indian_diffusion.json',
+        'pavia_diffusion.json',
+        'salinas_diffusion.json',
+
+        #'indian_ssftt.json',
+        #'pavia_ssftt.json',
+        #'salinas_ssftt.json',
+
+       # 'indian_conv1d.json',
+       # 'pavia_conv1d.json',
+       # 'salinas_conv1d.json',
+
+       # 'indian_conv2d.json',
+       # 'pavia_conv2d.json',
+       # 'salinas_conv2d.json',
     ]
     for config_name in configs:
         path_param = '%s/%s' % (config_path_prefix, config_name )
@@ -29,7 +47,8 @@ def simple_run_times():
                     with open(exchange_json_file,'w') as fout:
                         json.dump(params,fout)
                     print("schedule %s..." % uniq_name)
-                    os.system('python ./workflow.py')
+                    # subprocess.run('python ./workflow.py', shell=True)
+                    workflow.run_all()
                     print("schedule done of %s..." % uniq_name)
 
 

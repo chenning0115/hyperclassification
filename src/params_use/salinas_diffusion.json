@@ -3,6 +3,7 @@
         "data_sign": "Salinas",
         "data_file": "Salinas_40",
         "dump": false,
+        "use_dump": false,
         "diffusion_sign": true,
         "diffusion_data_sign_path_prefix": "/home/cn/codes/spectral_diff_temp/codes/save_feature/salinas_unet3d_patch16_without_downsample_kernal5_fix/save_feature",
         "diffusion_data_sign": "t5_2_full.pkl.npy",

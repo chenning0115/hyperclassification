@@ -9,6 +9,7 @@ import torch.nn.init as init
 
 
 
+
 def _weights_init(m):
     classname = m.__class__.__name__
     #print(classname)
@@ -106,7 +107,6 @@ class Transformer(nn.Module):
             x = mlp(x)  # go to MLP_Block
         return x
 
-
 class SSFTTnet(nn.Module):
     def __init__(self,params) :
         super(SSFTTnet, self).__init__()
@@ -128,19 +128,18 @@ class SSFTTnet(nn.Module):
 
         out_3d = 8
         self.conv3d_features = nn.Sequential(
-            nn.Conv3d(in_channels, out_channels=out_3d, kernel_size=(1, 3, 3), padding=(0,1,1)),
+            nn.Conv3d(in_channels, out_channels=out_3d, kernel_size=(3, 3, 3)),
             nn.BatchNorm3d(out_3d),
             nn.ReLU(),
         )
        
         self.conv2d_features = nn.Sequential(
-            # nn.Conv2d(in_channels=8*28, out_channels=64, kernel_size=(3, 3)),
-            nn.Conv2d(in_channels=self.spectral_size, out_channels=self.conv2d_out, kernel_size=(3, 3), padding=(1,1)),
+            nn.Conv2d(in_channels=8*28, out_channels=64, kernel_size=(3, 3)),
             nn.BatchNorm2d(self.conv2d_out),
             nn.ReLU(),
         )
 
-        # Tokenization
+         # Tokenization
         self.token_wA = nn.Parameter(torch.empty(1, self.L, 64),
                                      requires_grad=True)  # Tokenization parameters
         torch.nn.init.xavier_normal_(self.token_wA)
@@ -148,8 +147,7 @@ class SSFTTnet(nn.Module):
                                      requires_grad=True)  # Tokenization parameters
         torch.nn.init.xavier_normal_(self.token_wV)
 
-        # self.pos_embedding = nn.Parameter(torch.empty(1, (num_tokens + 1), dim))
-        self.pos_embedding = nn.Parameter(torch.empty(1, (self.patch_size * self.patch_size + 1), dim))
+        self.pos_embedding = nn.Parameter(torch.empty(1, (num_tokens + 1), dim))
         torch.nn.init.normal_(self.pos_embedding, std=.02)
 
         self.cls_token = nn.Parameter(torch.zeros(1, 1, dim))
@@ -163,25 +161,19 @@ class SSFTTnet(nn.Module):
         torch.nn.init.xavier_uniform_(self.nn1.weight)
         torch.nn.init.normal_(self.nn1.bias, std=1e-6)
 
-        self.temp_trans = nn.Linear(self.spectral_size * out_3d, dim)
-
     def forward(self, x, mask=None):
-
-        # x = self.conv3d_features(x)
+        x = self.conv3d_features(x)
         x = rearrange(x, 'b c h w y -> b (c h) w y')
         x = self.conv2d_features(x)
         x = rearrange(x,'b c h w -> b (h w) c')
 
-        # wa = rearrange(self.token_wA, 'b h w -> b w h')  # Transpose
-        # A = torch.einsum('bij,bjk->bik', x, wa)
-        # A = rearrange(A, 'b h w -> b w h')  # Transpose
-        # A = A.softmax(dim=-1)
+        wa = rearrange(self.token_wA, 'b h w -> b w h')  # Transpose
+        A = torch.einsum('bij,bjk->bik', x, wa)
+        A = rearrange(A, 'b h w -> b w h')  # Transpose
+        A = A.softmax(dim=-1)
 
-        # VV = torch.einsum('bij,bjk->bik', x, self.token_wV)
-        # T = torch.einsum('bij,bjk->bik', A, VV)
-
-        # T = self.temp_trans(x)
-        T = x
+        VV = torch.einsum('bij,bjk->bik', x, self.token_wV)
+        T = torch.einsum('bij,bjk->bik', A, VV)
 
         cls_tokens = self.cls_token.expand(x.shape[0], -1, -1)
         x = torch.cat((cls_tokens, T), dim=1)
@@ -195,10 +187,11 @@ class SSFTTnet(nn.Module):
 
 
 if __name__ == '__main__':
-    model = SSFTTnet()
+    model = SSFTTnet({"net":{}, "data":{}})
     model.eval()
     print(model)
     input = torch.randn(64, 1, 30, 13, 13)
     y = model(input)
     print(y.size())
+
 

@@ -224,8 +224,10 @@ class HSIDataLoader(object):
             norm_data = data 
         pca_num = self.data_param.get('pca', 0)
         if pca_num > 0:
+            print('before pca')
             pca_data = self.applyPCA(norm_data, int(self.data_param['pca']))
             norm_data = pca_data
+            print('after pca')
         if self.spectracl_size > 0: # 按照给定的spectral size截取数据
             norm_data = norm_data[:,:,:self.spectracl_size]
         return norm_data
