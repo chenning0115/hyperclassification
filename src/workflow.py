@@ -9,7 +9,7 @@ from trainer import get_trainer, BaseTrainer, CrossTransformerTrainer
 import evaluation
 from utils import check_convention, config_path_prefix
 
-DEFAULT_RES_SAVE_PATH_PREFIX = "./res/"
+DEFAULT_RES_SAVE_PATH_PREFIX = "./res_diffusion_t_layer/"
 
 def train_by_param(param):
     #0. recorder reset防止污染数据
@@ -71,6 +71,7 @@ include_path = [
     # 'salinas_cross_param_use.json'
     # 'pavia_cross_param_use.json',
     
+    # 'indian_diffusion.json',
     # 'pavia_diffusion.json',
     # 'salinas_diffusion.json',
 
@@ -79,6 +80,22 @@ include_path = [
     # for batch process 
     'temp.json'
 ]
+def run_one(param):
+    save_path_prefix = DEFAULT_RES_SAVE_PATH_PREFIX
+    if not os.path.exists(save_path_prefix):
+        os.makedirs(save_path_prefix)
+    name = param['net']['trainer']
+    convention = check_convention(name)
+    uniq_name = param.get('uniq_name', name)
+    print('start to train %s...' % uniq_name)
+    if convention:
+        train_convention_by_param(param)
+    else:
+        train_by_param(param)
+    print('model eval done of %s...' % uniq_name)
+    path = '%s/%s' % (save_path_prefix, uniq_name) 
+    recorder.to_file(path)
+
 
 def run_all():
     print('11111')
@@ -108,8 +125,41 @@ def run_all():
         print('88888')
 
 
+def result_file_exists(prefix, file_name_part):
+    ll = os.listdir(prefix)
+    for l in ll:
+        if file_name_part in l:
+            return True
+    return False
+
+def run_diffusions():
+    sample_num = 30
+    config_name = 'salinas_diffusion.json'
+    tlist = [5, 10, 50, 100, 200]
+    layers = [0, 1, 2]
+
+    path_param = '%s/%s' % (config_path_prefix, config_name)
+    with open(path_param, 'r') as fin:
+        params = json.loads(fin.read())
+        for t in tlist:
+            for l in layers:
+                res_file_part = "%s_%s_%s" %(config_name, t, l) 
+                if result_file_exists(DEFAULT_RES_SAVE_PATH_PREFIX, res_file_part):
+                    print(res_file_part, "exits, now continue...")
+                    continue
+                data_sign = params['data']['data_sign']
+                uniq_name = "%s_%s_%s" % (config_name, t, l)
+                params['uniq_name'] = uniq_name
+                params['data']['data_file'] = '%s_%s' % (data_sign, sample_num)
+                params['data']['diffusion_data_sign'] = 't%s_%s_full.pkl.npy' % (t, l)
+                print("schedule %s..." % uniq_name)
+                # subprocess.run('python ./workflow.py', shell=True)
+                run_one(params)
+                print("schedule done of %s..." % uniq_name)
+
+
 if __name__ == "__main__":
-    run_all()
+    run_diffusions()
     
     
 

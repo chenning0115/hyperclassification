@@ -1,11 +1,11 @@
 {
     "data": {
         "data_sign": "Pavia",
-        "data_file": "Pavia_40",
+        "data_file": "Pavia_30",
         "dump": false,
         "use_dump": false,
         "diffusion_sign": true,
-        "diffusion_data_sign_path_prefix": "/home/cn/codes/spectral_diff_temp/codes/save_feature/pavia_unet3d_patch64_without_downsample_kernal5_fix/save_feature",
+        "diffusion_data_sign_path_prefix": "/home/cn/data/save_feature/pavia_unet3d_patch64_without_downsample_kernal5_fix/save_feature",
         "diffusion_data_sign": "t5_0_full.pkl.npy",
         "patch_size": 13,
         "test_ratio": 0.95,
