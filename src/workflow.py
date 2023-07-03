@@ -9,7 +9,7 @@ from trainer import get_trainer, BaseTrainer, CrossTransformerTrainer
 import evaluation
 from utils import check_convention, config_path_prefix
 
-DEFAULT_RES_SAVE_PATH_PREFIX = "./res_diffusion_t_layer/"
+DEFAULT_RES_SAVE_PATH_PREFIX = "./res_diffusion_serving_time/"
 
 def train_by_param(param):
     #0. recorder reset防止污染数据
@@ -22,13 +22,20 @@ def train_by_param(param):
     trainer = get_trainer(param)
     trainer.train(train_loader, unlabel_loader,test_loader)
     eval_res = trainer.final_eval(test_loader)
-    # pred_all, y_all = trainer.test(all_loader)
-    # pred_matrix = dataloader.reconstruct_pred(pred_all)
+    
+    start_eval_time = time.time()
+    pred_all, y_all = trainer.test(all_loader)
+    end_eval_time = time.time()
+    eval_time = end_eval_time - start_eval_time
+    print("eval time is %s" % eval_time) 
+    recorder.record_time(eval_time)
+    pred_matrix = dataloader.reconstruct_pred(pred_all)
+
 
     #3. record all information
     recorder.record_param(param)
     recorder.record_eval(eval_res)
-    # recorder.record_pred(pred_matrix)
+    recorder.record_pred(pred_matrix)
 
     return recorder
 
@@ -70,15 +77,26 @@ include_path = [
 
     # 'salinas_cross_param_use.json'
     # 'pavia_cross_param_use.json',
+
+    # "indian_conv1d.json",
+    # "indian_conv2d.json",
     
+    # "pavia_conv1d.json",
+    # "pavia_conv2d.json",
+
+    # "salinas_conv1d.json",
+    # "salinas_conv2d.json",
     # 'indian_diffusion.json',
     # 'pavia_diffusion.json',
     # 'salinas_diffusion.json',
+    # "indian_ssftt.json",
+    # "pavia_ssftt.json",
+    "salinas_ssftt.json",
 
     # 'indian_ssftt.json',
 
     # for batch process 
-    'temp.json'
+    # 'temp.json'
 ]
 def run_one(param):
     save_path_prefix = DEFAULT_RES_SAVE_PATH_PREFIX
@@ -159,7 +177,8 @@ def run_diffusions():
 
 
 if __name__ == "__main__":
-    run_diffusions()
+    # run_diffusions()
+    run_all()
     
     
 

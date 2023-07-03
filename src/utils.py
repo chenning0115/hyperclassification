@@ -53,6 +53,9 @@ class HSIRecoder(object):
             } 
         self.record_data[name]['index'].append(index)
         self.record_data[name]['value'].append(value)
+    
+    def record_time(self, time):
+        self.record_data['eval_time'] = time
 
     def record_param(self, param):
         self.record_data['param'] = param 
@@ -72,7 +75,7 @@ class HSIRecoder(object):
         with open(save_path_json, 'w') as fout:
             fout.write(ss)
             fout.flush()
-        # np.save(save_path_pred, self.pred)
+        np.save(save_path_pred, self.pred)
 
         print("save record of %s done!" % path)
         

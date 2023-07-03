@@ -1,7 +1,7 @@
 {
     "data": {
         "data_sign": "Indian",
-        "data_file": "Indian_10",
+        "data_file": "Indian_30",
         "diffusion_sign": true,
         "diffusion_data_sign_path_prefix": "/home/cn/data/save_feature/indian_unet3d_patch16_without_downsample_kernal5_fix/save_feature",
         "diffusion_data_sign": "t5_2_full.pkl.npy",
