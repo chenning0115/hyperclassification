@@ -9,11 +9,7 @@ from trainer import get_trainer, BaseTrainer, CrossTransformerTrainer
 import evaluation
 from utils import check_convention, config_path_prefix
 
-<<<<<<< Updated upstream
 DEFAULT_RES_SAVE_PATH_PREFIX = "./res_diffusion_serving_time/"
-=======
-DEFAULT_RES_SAVE_PATH_PREFIX = "./res_image/10"
->>>>>>> Stashed changes
 
 def train_by_param(param):
     #0. recorder reset防止污染数据
@@ -26,7 +22,6 @@ def train_by_param(param):
     trainer = get_trainer(param)
     trainer.train(train_loader, unlabel_loader,test_loader)
     eval_res = trainer.final_eval(test_loader)
-<<<<<<< Updated upstream
     
     start_eval_time = time.time()
     pred_all, y_all = trainer.test(all_loader)
@@ -36,10 +31,6 @@ def train_by_param(param):
     recorder.record_time(eval_time)
     pred_matrix = dataloader.reconstruct_pred(pred_all)
 
-=======
-    pred_all, y_all = trainer.test(all_loader)
-    pred_matrix = dataloader.reconstruct_pred(pred_all)
->>>>>>> Stashed changes
 
     #3. record all information
     recorder.record_param(param)
