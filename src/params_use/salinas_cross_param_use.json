@@ -1,7 +1,7 @@
 {
     "data": {
         "data_sign": "Salinas",
-        "data_file": "Salinas_40",
+        "data_file": "Salinas_30",
         "dump": false,
         "diffusion_sign": false,
         "diffusion_data_sign_path_prefix": "/home/cn/codes/spectral_diff_temp/codes/save_feature/salinas_unet3d_patch16_without_downsample_kernal5_fix/save_feature",

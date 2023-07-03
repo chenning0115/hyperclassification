@@ -15,7 +15,7 @@ import pandas as pd
 # [255, 0, 255],  [176, 48, 96], [46, 139, 87], [160, 32, 240], [255, 127, 80],
 #  [127, 255, 212],  [218, 112, 214], [160, 82, 45], [127, 255, 0], [216, 191, 216]]
 
-colors = [[0, 0, 1],
+colors = [[0,0,0],[100, 200, 200],
     [127, 255, 0],[0, 255, 0], [0, 0, 255], [46, 139, 87],[255, 0, 255], 
     [0, 255, 255],[255, 255, 255], [160, 82, 45], [160, 32, 240], [255, 127, 80],
     [218, 112, 214], [255, 0, 0], [255, 255, 0], [127, 255, 212],  [216, 191, 216]
@@ -24,10 +24,19 @@ def data_to_colormap2(data):
     assert len(data.shape)==2
     x_list = data.reshape((-1,))
     y = np.zeros((x_list.shape[0], 3))
+    print(str(x_list.shape[0]))
     for index, item in enumerate(x_list):
         y[index] = np.array(colors[item]) / 255
     return y
 
+def data_to_colormap3(data, colors):
+    assert len(data.shape)==2
+    x_list = data.reshape((-1,))
+    y = np.zeros((x_list.shape[0], 3))
+    print(str(x_list.shape[0]))
+    for index, item in enumerate(x_list):
+        y[index] = np.array(colors[item]) / 255
+    return y
 
 def data_to_colormap(data):
     assert len(data.shape)==2

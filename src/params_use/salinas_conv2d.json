@@ -1,7 +1,7 @@
 {
     "data": {
         "data_sign": "Salinas",
-        "data_file": "Salinas_20",
+        "data_file": "Salinas_10",
         "diffusion_sign": false,
         "patch_size": 1,
         "test_ratio": 0.95,
@@ -14,7 +14,7 @@
         "trainer": "conv2d"
     },
     "train": {
-        "epochs": 500,
+        "epochs": 300,
         "lr": 0.001,
         "weight_decay": 0
     }

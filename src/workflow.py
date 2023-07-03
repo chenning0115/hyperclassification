@@ -9,7 +9,11 @@ from trainer import get_trainer, BaseTrainer, CrossTransformerTrainer
 import evaluation
 from utils import check_convention, config_path_prefix
 
+<<<<<<< Updated upstream
 DEFAULT_RES_SAVE_PATH_PREFIX = "./res_diffusion_serving_time/"
+=======
+DEFAULT_RES_SAVE_PATH_PREFIX = "./res_image/10"
+>>>>>>> Stashed changes
 
 def train_by_param(param):
     #0. recorder reset防止污染数据
@@ -22,6 +26,7 @@ def train_by_param(param):
     trainer = get_trainer(param)
     trainer.train(train_loader, unlabel_loader,test_loader)
     eval_res = trainer.final_eval(test_loader)
+<<<<<<< Updated upstream
     
     start_eval_time = time.time()
     pred_all, y_all = trainer.test(all_loader)
@@ -31,6 +36,10 @@ def train_by_param(param):
     recorder.record_time(eval_time)
     pred_matrix = dataloader.reconstruct_pred(pred_all)
 
+=======
+    pred_all, y_all = trainer.test(all_loader)
+    pred_matrix = dataloader.reconstruct_pred(pred_all)
+>>>>>>> Stashed changes
 
     #3. record all information
     recorder.record_param(param)
@@ -67,14 +76,22 @@ def train_convention_by_param(param):
 
 
 include_path = [
-    # "indian_ssftt.json",
+    "indian_conv1d.json",
+    "indian_conv2d.json",
+    "indian_ssftt.json",
     # 'indian_casst.json'
     # 'indian_cross_param.json',
     # 'indian_cross_param_use.json',
 
+    "pavia_conv1d.json",
+    "pavia_conv2d.json",
+    "pavia_ssftt.json",
     # 'pavia_cross_param_use.json',
     # 'pavia_cross_param.json',
 
+    "salinas_conv1d.json",
+    "salinas_conv2d.json",
+    "salinas_ssftt.json",
     # 'salinas_cross_param_use.json'
     # 'pavia_cross_param_use.json',
 
@@ -116,31 +133,23 @@ def run_one(param):
 
 
 def run_all():
-    print('11111')
     save_path_prefix = DEFAULT_RES_SAVE_PATH_PREFIX
     if not os.path.exists(save_path_prefix):
         os.makedirs(save_path_prefix)
-    print('22222')
     for name in include_path:
         convention = check_convention(name)
         path_param = '%s/%s' % (config_path_prefix, name)
-        print('33333')
         with open(path_param, 'r') as fin:
             param = json.loads(fin.read())
-        print('44444')
         uniq_name = param.get('uniq_name', name)
         print('start to train %s...' % uniq_name)
         if convention:
             train_convention_by_param(param)
         else:
-            print('55555')
             train_by_param(param)
-            print('66666')
         print('model eval done of %s...' % uniq_name)
         path = '%s/%s' % (save_path_prefix, uniq_name) 
-        print('77777')
         recorder.to_file(path)
-        print('88888')
 
 
 def result_file_exists(prefix, file_name_part):

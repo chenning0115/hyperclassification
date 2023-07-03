@@ -5,6 +5,7 @@ import scipy.io as sio
 from sklearn.model_selection import train_test_split
 import random
 import tifffile as tiff
+import os, sys
 
 
 def load_data(data_sign, data_path_prefix):
@@ -57,9 +58,9 @@ def gen(data_sign, train_num_per_class, data_path_prefix, max_percent=0.5):
 
 
 def run():
-    #signs = ['Indian', 'Pavia', 'Houston', 'Salinas']
+    signs = ['Indian', 'Pavia', 'Salinas']
     #signs = ['Salinas']
-    signs = ['Indian']
+    # signs = ['Indian']
     data_path_prefix = '../../data'
     train_num_per_class_list = [10, 20, 30, 40, 50, 60, 70, 80]
     for data_sign in signs:
@@ -69,8 +70,29 @@ def run():
             sio.savemat(save_path, target)
             print('save %s done.' % save_path)
 
+def run_miniGCN():
+    signs = ['Pavia']
+    data_path_prefix = '../../data'
+    train_num_per_class_list = [10]
+    for data_sign in signs:
+        for train_num_per_class in train_num_per_class_list:
+            save_path_prefix = '../../data/miniGCN/%s/%s' %(data_sign, train_num_per_class)
+            if not os.path.exists(save_path_prefix):
+                os.makedirs(save_path_prefix)
+            target = gen(data_sign, train_num_per_class, data_path_prefix)
 
+
+            data, TR, TE = target['input'], target['TR'], target['TE']
+            data_new = data.transpose((2,0,1))
+            TALL = TE + TR
+            TALL[TALL == 0] = 1
+            print(data_new.shape, TR.shape, TE.shape, TALL.shape)
+            tiff.imsave('%s/data.tiff' % save_path_prefix, data_new)
+            tiff.imsave('%s/TR.tiff' % save_path_prefix, TR)
+            tiff.imsave('%s/TE.tiff' % save_path_prefix, TE)
+            tiff.imsave('%s/ALL.tiff' % save_path_prefix, TALL)
 
 if __name__ == "__main__":
-    run()
+    # run()
+    run_miniGCN()
 

@@ -1,7 +1,7 @@
 {
     "data": {
         "data_sign": "Pavia",
-        "data_file": "Pavia_20",
+        "data_file": "Pavia_10",
         "diffusion_sign": false,
         "patch_size": 1,
         "test_ratio": 0.95,
@@ -15,7 +15,7 @@
         "trainer": "conv1d"
     },
     "train": {
-        "epochs": 500,
+        "epochs": 300,
         "lr": 0.001,
         "weight_decay": 0
     }

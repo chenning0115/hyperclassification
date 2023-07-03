@@ -1,7 +1,7 @@
 {
     "data": {
         "data_sign": "Indian",
-        "data_file": "Indian_20",
+        "data_file": "Indian_10",
         "diffusion_sign": false,
         "patch_size": 13,
         "test_ratio": 0.95,

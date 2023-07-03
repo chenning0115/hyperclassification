@@ -11,6 +11,7 @@ from models import conv2d
 from models import conv3d
 from models import SSFTTnet
 from models import CASST
+from models import SSRN
 import utils
 from utils import recorder
 from evaluation import HSIEvaluation
@@ -86,6 +87,7 @@ class BaseTrainer(object):
         self.train_params = params['train']
         self.device = device 
         self.evalator = HSIEvaluation(param=params)
+        self.class_num = params['data']['num_classes']
 
         self.net = None
         self.criterion = None
@@ -155,6 +157,7 @@ class BaseTrainer(object):
         for inputs, labels in test_loader:
             inputs = inputs.to(self.device)
             outputs = self.get_logits(self.net(inputs))
+            outputs = outputs.reshape((-1,self.class_num))
             outputs = np.argmax(outputs.detach().cpu().numpy(), axis=1)
             if count == 0:
                 y_pred_test = outputs
@@ -172,7 +175,7 @@ class BaseContraTrainer(object):
         self.params = params
         self.net_params = params['net']
         self.train_params = params['train']
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = device
         self.evalator = HSIEvaluation(param=params)
         self.aug=params.get("aug",None)
         self.use_unlabel=params['train'].get('use_unlabel',False)
@@ -586,6 +589,20 @@ class CASSTTrainer(BaseTrainer):
         # optimizer
         self.optimizer = torch.optim.SGD(self.net.parameters(), 0.005, momentum=0.9, weight_decay=1e-4, nesterov=True)
 
+class SSRNTrainer(BaseTrainer):
+    def __init__(self, params) -> None:
+        super().__init__(params)
+
+    def real_init(self):
+        # net
+        self.net = SSRN.SSRN(self.params).to(self.device) #这边传入SSRN需要的参数
+        # optimizer
+        self.lr = self.train_params.get('lr', 0.001)
+        self.weight_decay = self.train_params.get('weight_decay', 5e-3)
+        self.optimizer = optim.Adam(self.net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+        # loss
+        self.criterion = nn.CrossEntropyLoss()
+
 def get_trainer(params):
     trainer_type = params['net']['trainer']
     if trainer_type == "cross_trainer":
@@ -612,6 +629,7 @@ def get_trainer(params):
         return SSFTTTrainer(params)
     if trainer_type == "casst":
         return CASSTTrainer(params)
-
+    if trainer_type =="SSRN":
+        return SSRNTrainer(params)
     assert Exception("Trainer not implemented!")
 
