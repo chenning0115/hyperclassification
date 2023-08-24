@@ -72,7 +72,7 @@ include_path = [
     # 'indian_cross_param.json',
     # 'indian_cross_param_use.json',
 
-    # 'pavia_cross_param_use.json',
+    'pavia_cross_param_use.json',
     # 'pavia_cross_param.json',
 
     # 'salinas_cross_param_use.json'
@@ -91,7 +91,7 @@ include_path = [
     # 'salinas_diffusion.json',
     # "indian_ssftt.json",
     # "pavia_ssftt.json",
-    "salinas_ssftt.json",
+    # "salinas_ssftt.json",
 
     # 'indian_ssftt.json',
 
